@@ -1,14 +1,18 @@
-const db = require('./localdatabase.config')
+const database = require("../config/dbServer")
 const Sequelize = require('sequelize')
 
 const sequelize = new Sequelize(
-  db.database,
-  db.user,
-  db.password, {
-    host: db.host,
+  database.database,
+  database.user,
+  database.password, {
+    host: database.host,
     logging: false,
-    dialect: db.dialect,
+    dialect: database.dialect,
     dialectOptions: {
+      ssl: {
+        require: true, 
+        rejectUnauthorized: false
+      }
     },
   }
 )

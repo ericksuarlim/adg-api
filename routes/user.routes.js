@@ -17,7 +17,7 @@ module.exports = function (app) {
     });
 
     //Get user
-    app.get("/users/:id_user",async(req,res)=>{
+    app.get("/users/:uuid-user",async(req,res)=>{
         try{
             const user = await UserService.GetUser(req);
             res.status(200).json(user);
@@ -37,7 +37,7 @@ module.exports = function (app) {
     });
 
     //Update User
-    app.put("/users/:id_user", async (req,res) =>{
+    app.put("/users/:uuid-user", async (req,res) =>{
         try{
             const user_updated = await UserService.UpdateUser(req);
             res.status(200).json(user_updated);
@@ -47,7 +47,7 @@ module.exports = function (app) {
     });
 
     //ManageUser User
-    app.put("/users/manage/:id_user", async (req,res) =>{
+    app.put("/users/manage/:uuid_user", async (req,res) =>{
         try{
             const user_updated = await UserService.ManageUser(req);
             res.status(200).json(user_updated);
@@ -57,7 +57,7 @@ module.exports = function (app) {
     });
 
     //Delete User
-    app.delete("/users/:id_user", async (req,res)=>{
+    app.delete("/users/:uuid_user", async (req,res)=>{
         try {
             const is_deleted = await UserService.DeleteUser(req);
             res.status(200).json(is_deleted);

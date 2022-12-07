@@ -6,7 +6,7 @@ User.init({
     uuid_user: {
         type: DataTypes.INTEGER,
         primaryKey: true,
-    autoIncrement: true
+        autoIncrement: true
     },
     id_card: {
         type: DataTypes.INTEGER
