@@ -2,8 +2,9 @@ const {app, localhostPort} = require("./config/server.config.js");
 const sequelize = require("./config/sequelize")
 
 require("./routes/user.routes")(app);
-require("./routes/autentication.routes")(app);
+require("./routes/authentication.routes")(app);
 require("./routes/general.routes")(app);
+require("./routes/attendance.routes")(app);
 
 
 const PORT = process.env.PORT || localhostPort;

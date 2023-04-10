@@ -1,4 +1,4 @@
-const _Autentication_Service = require ("../services/autentication.service");
+const _Autentication_Service = require ("../services/authentication.service");
 const AutenticationService = new _Autentication_Service();
 require('dotenv').config();
 

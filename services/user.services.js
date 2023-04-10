@@ -52,7 +52,7 @@ class UserService {
         }
     }
 
-    //Actualizar Usuario
+    //Update User
     async UpdateUser(data){
         try{
             const user_updated = await this.user.update(data.body,{where: {uuid_user:data.params.uuid_user},returning: true,plain: true}).then(function (result) {
