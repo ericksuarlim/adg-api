@@ -1,17 +1,16 @@
-const BaseError = require('./baseError');
-const HttpStatusCodes = require('./httpStatusCodes');
-import { BaseError } from "./baseError";
-import { HttpStatusCodes } from "./baseError";
+import { ApiErrorArgs } from '../interfaces/common/api-error.interface';
+import BaseError from './baseError';
+import HttpStatusCodes from './httpStatusCodes';
 
 class ApiError extends BaseError {
-    constructor({
-            name = 'ApiError',
-            statusCode = HttpStatusCodes.INTERNAL_SERVER_ERROR,
-            description = 'Error en la API',
-            isOperational = true,
-        }) {
-        super(name, statusCode, isOperational, description);
+    constructor(args: ApiErrorArgs = {}) {
+        super(
+            args.name || 'ApiError',
+            args.statusCode || HttpStatusCodes.INTERNAL_SERVER_ERROR,
+            args.isOperational ?? true,
+            args.description || 'Error en la API'
+        );
     }
 }
 
-module.exports = ApiError;
+export default ApiError;

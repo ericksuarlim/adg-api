@@ -1,7 +1,9 @@
-const ApiError = require('../errors/apiError');
-const HttpStatusCodes = require('../errors/httpStatusCodes');
+import { Request, Response, NextFunction } from 'express';
+import ApiError from '../errors/apiError';
+import HttpStatusCodes from '../errors/httpStatusCodes';
+import { ErrorHandler } from "../interfaces/middleware/error-middleware.interface";
 
-function errorHandler(err, req, res, next) {
+const errorHandler: ErrorHandler = (err, req, res, next) => {
     if (err instanceof ApiError) {
         return res.status(err.statusCode).json({
             error: {
@@ -21,8 +23,6 @@ function errorHandler(err, req, res, next) {
             statusCode: 500,
         },
     });
-}
-
-module.exports = {
-    errorHandler,
 };
+
+export default errorHandler;

@@ -1,8 +1,14 @@
-import express from 'express';
-const router = express.Router();
+import { Router } from 'express';
+import authenticationRouter from './authentication.routes';
+import cattleWorkSessionRouter from './authentication.routes';
+import cattleRoutes from './authentication.routes';
+import userRoutes from "./user.routes";
+/**/
+const router = Router();
 
-router.use('/attendances', require('./attendance.routes'));
-// router.use('/users', require('./user.routes'));
-// ...
+router.use('/cattle-work-session', cattleWorkSessionRouter);
+router.use('/session', authenticationRouter);
+router.use('/cattle', cattleRoutes);
+router.use('/user', userRoutes);
 
-module.exports = router;
+export default router;

@@ -1,4 +1,4 @@
-import { envConfig } from './env';
+import { envConfig } from './env.config';
 
 const pgConfig = {
     user: envConfig.DB_USER,

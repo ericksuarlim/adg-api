@@ -1,4 +1,4 @@
-import { envConfig } from "./env";
+import { envConfig } from "./env.config";
 
 const jwtConfig = {
     secret: envConfig.JWT_SECRET || 'fallback-secret',

@@ -1,9 +1,4 @@
-import { Model } from 'sequelize';
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
-import {
-    AttendanceAttributes,
-    AttendanceCreationAttributes
-} from "../interfaces/attendance/attendance.general.interface";
 import {
     ICreateService,
     IDeleteService,
@@ -11,29 +6,34 @@ import {
     IGetService,
     IUpdateService
 } from "../interfaces/services/base-service.interface";
+import {
+    CattleWorkSessionAttributes,
+    CattleWorkSessionCreationAttributes
+} from "../interfaces/work-session/cattle-work-session.interface";
+import {UserAttributes} from "../interfaces/user/user.interface";
 
-class AttendanceService implements
-    IGetAllService<AttendanceAttributes>,
-    IGetService<AttendanceAttributes>,
-    ICreateService<AttendanceAttributes, AttendanceCreationAttributes>,
-    IUpdateService<AttendanceAttributes, AttendanceCreationAttributes>,
+class CattleWorkSessionService implements
+    IGetAllService<CattleWorkSessionAttributes>,
+    IGetService<CattleWorkSessionAttributes>,
+    ICreateService<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>,
+    IUpdateService<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>,
     IDeleteService {
 
-    private attendanceModel: typeof Model;
+    private cattleWorkSessionModel: any;
 
-    constructor(GeneralModel: typeof Model) {
-        this.attendanceModel = GeneralModel;
+    constructor(CattleWorkSessionModel: any) {
+        this.cattleWorkSessionModel = CattleWorkSessionModel;
     }
 
     async getAll(
         params: { page: number; size: number; sortBy: string; order: 'ASC' | 'DESC' }
-    ): Promise<ServiceResponse<AttendanceAttributes[]>> {
+    ): Promise<ServiceResponse<CattleWorkSessionAttributes[]>> {
         const { page, size, sortBy, order } = params;
 
         const offset = (page - 1) * size;
         const limit = size;
 
-        const result = await this.attendanceModel.findAndCountAll({
+        const result = await this.cattleWorkSessionModel.findAndCountAll({
             offset,
             limit,
             order: [[sortBy, order]],
@@ -41,7 +41,7 @@ class AttendanceService implements
 
         const totalPages = Math.ceil(result.count / size);
 
-        const plainRows: AttendanceAttributes[] = result.rows.map((attendance: any) =>
+        const plainRows: CattleWorkSessionAttributes[] = result.rows.map((attendance: any) =>
             attendance.toJSON?.() ?? attendance
         );
 
@@ -53,21 +53,21 @@ class AttendanceService implements
                 totalPages,
                 currentPage: page,
             },
-        };
+        } as ServiceResponse<CattleWorkSessionAttributes[]>;
     }
 
     async create(
-        attendanceBody: AttendanceCreationAttributes
-    ): Promise<ServiceResponse<AttendanceAttributes>> {
-        const attendance = await this.attendanceModel.create(attendanceBody);
+        attendanceBody: CattleWorkSessionCreationAttributes
+    ): Promise<ServiceResponse<CattleWorkSessionAttributes>> {
+        const attendance = await this.cattleWorkSessionModel.create(attendanceBody);
 
         return { success: true, data: attendance };
     }
 
     async getById(
         id_attendance: string
-    ): Promise<ServiceResponse<AttendanceAttributes | null>> {
-        const attendance = await this.attendanceModel.findByPk(id_attendance);
+    ): Promise<ServiceResponse<CattleWorkSessionAttributes | null>> {
+        const attendance = await this.cattleWorkSessionModel.findByPk(id_attendance);
 
         if (!attendance)
             return { success: false, error: 'Attendance not found', code: 404 };
@@ -77,9 +77,9 @@ class AttendanceService implements
 
     async update(
         id_attendance: string,
-        attendanceBody: AttendanceCreationAttributes
-    ): Promise<ServiceResponse<AttendanceAttributes | null>> {
-        const [count, updatedAttendance] = await this.attendanceModel.update(attendanceBody, {
+        attendanceBody: CattleWorkSessionCreationAttributes
+    ): Promise<ServiceResponse<CattleWorkSessionAttributes | null>> {
+        const [count, updatedAttendance] = await this.cattleWorkSessionModel.update(attendanceBody, {
             where: { id_attendance },
             returning: true,
             plain: true,
@@ -94,7 +94,7 @@ class AttendanceService implements
     async delete(
         id_attendance: string
     ): Promise<ServiceResponse<null>> {
-        const attendance = await this.attendanceModel.findByPk(id_attendance);
+        const attendance = await this.cattleWorkSessionModel.findByPk(id_attendance);
 
         if (!attendance)
             return { success: false, error: 'Attendance not found', code: 404 };
@@ -105,4 +105,4 @@ class AttendanceService implements
     }
 }
 
-export default AttendanceService;
+export default CattleWorkSessionService;

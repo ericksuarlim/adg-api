@@ -1,9 +1,9 @@
 import { Sequelize } from 'sequelize';
-import dbConfig from '../config/database';
+import dbConfig from '../config/database.config';
 
 const sequelize = new Sequelize(
     dbConfig.database as string,
-    dbConfig.username as string,
+    dbConfig.user as string,
     dbConfig.password as string,
     {
             host: dbConfig.host,
@@ -16,12 +16,3 @@ const sequelize = new Sequelize(
 
 export default sequelize;
 
-// Descomenta esto si quieres hacer una prueba de conexión al iniciar
-// (async () => {
-//   try {
-//     await sequelize.authenticate();
-//     console.log('Conexión a base de datos establecida con éxito.');
-//   } catch (error) {
-//     console.error('No se pudo conectar a la base de datos:', (error as Error).message);
-//   }
-// })();

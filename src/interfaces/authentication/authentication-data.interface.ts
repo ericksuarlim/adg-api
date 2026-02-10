@@ -4,7 +4,7 @@ export interface LoginData {
 }
 
 export interface ResetPasswordData {
-    uuid_user: number;
+    uuid_user: string;
     code: string;
     [key: string]: any;
 }

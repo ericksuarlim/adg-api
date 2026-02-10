@@ -8,7 +8,7 @@ import {
 class CattleWorkSessionModel extends Model<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>
     implements CattleWorkSessionAttributes {
     declare id_cattle_work: number;
-    declare c: string;
+    declare uuid_cattle: string;
     declare work_session_id: string;
     declare attended: boolean;
     declare condition: string;
@@ -28,23 +28,39 @@ CattleWorkSessionModel.init(
             type: DataTypes.STRING,
             allowNull: false,
         },
-        condition: {
+        work_session_id: {
             type: DataTypes.STRING,
+            allowNull: false,
+        },
+        attended: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+        condition: {
+            type: DataTypes.STRING(100),
             allowNull: false,
         },
         observation: {
-            type: DataTypes.STRING,
+            type: DataTypes.TEXT,
             allowNull: true,
         },
-        id_health_service: {
-            type: DataTypes.INTEGER,
+        received_medical: {
+            type: DataTypes.BOOLEAN,
             allowNull: false,
+            defaultValue: false,
+        },
+        created_at: {
+            type: DataTypes.DATE,
+            allowNull: false,
+            defaultValue: DataTypes.NOW,
         },
     },
     {
         sequelize,
-        tableName: 'cattle_work_session',
+        modelName: 'cattle_work_session',
         timestamps: false,
+        freezeTableName: true,
     }
 );
 

@@ -1,25 +1,30 @@
-version: '3.8'
-
 services:
-  backend:
+  adg-api-services:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DB_HOST=postgres
-      - DB_USER=postgres
-      - DB_PASSWORD=secret
-      - DB_NAME=mydb
+      NODE_ENV: development
+      DB_HOST: adg-db-postgres-services
+      DB_PORT: 5432
+      DB_USER: adg-user-postgres
+      DB_PASSWORD: postgres
+      DB_NAME: adg-db-postgres
+      JWT_SECRET: tu-clave-super-secret
+    command: npm run dev
+    volumes:
+      - .:/app
+      - /app/node_modules
     depends_on:
-      - postgres
+      - adg-db-postgres-services
 
-  postgres:
+  adg-db-postgres-services:
     image: postgres:15
     restart: always
     environment:
-      POSTGRES_DB: mydb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: adg-db-postgres
+      POSTGRES_USER: adg-user-postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:

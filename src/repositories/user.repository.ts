@@ -1,23 +1,29 @@
-const Pool = require("pg").Pool;
-const database = require("../src/database/config/dbServer")
+import {Pool} from 'pg';
+import {UserAttributes} from "../interfaces/user/user.interface";
+import database from "../config/database.config";
+import {ServiceResponse} from "../interfaces/common/service-response.interface";
 
 class UserRepository {
-    constructor(){
-        this.cursor = null;
+    private pool: Pool;
+
+    constructor() {
         this.pool = new Pool(database);
     }
 
-    //Manage User
-    async ManageUser(id_user){
-        const user_updated = await this.pool.query(
-        "UPDATE public.user SET enabled= NOT enabled WHERE uuid_user=$1 RETURNING *",
-        [
-            id_user,
-        ]
+    async ManageUser(uuid_user: string): Promise<ServiceResponse<UserAttributes>> {
+        const result = await this.pool.query<UserAttributes>(
+            `UPDATE public.user
+             SET enabled = NOT enabled
+             WHERE uuid_user = $1 RETURNING *`,
+            [uuid_user]
         );
-        return user_updated.rows[0]; 
+
+        if (result.rows.length === 0) {
+            return {success: false, error: 'User not found', code: 404};
+        }
+
+        return {success: true, data: result.rows[0]};
     }
-   
 }
 
-module.exports = UserRepository;
+export default UserRepository;

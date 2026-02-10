@@ -1,7 +1,7 @@
-import { envConfig } from './env';
+import { envConfig } from './env.config';
 
 const databaseConfig = {
-    username: envConfig.DB_USER,
+    user: envConfig.DB_USER,
     password: envConfig.DB_PASSWORD,
     database: envConfig.DB_NAME,
     host: envConfig.DB_HOST,

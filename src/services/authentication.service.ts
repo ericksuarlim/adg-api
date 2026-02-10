@@ -1,24 +1,16 @@
-import AuthenticationRepository from '../repositories/autentication.repository';
-import ApiError from '../errors/apiError';
-import SessionServiceClass from './session.service';
-import SessionModel from '../database/models/session';
-import UserServiceClass from './user.services';
-import UserModel from '../database/models/user';
 import jwt from 'jsonwebtoken';
-import httpStatusCodes from '../errors/httpStatusCodes';
+import AuthenticationRepository from '../repositories/authentication.repository';
+import SessionServiceClass from './session.service';
+import SessionModel from '../database/models/session.model';
+import UserServiceClass from './user.services';
+import UserModel from '../database/models/user.model';
+import { ServiceResponse } from '../interfaces/common/service-response.interface';
+import { LoginData, ResetPasswordData, LogoutData } from '../interfaces/authentication/authentication-data.interface';
+import { IAuthenticationService } from '../interfaces/services/authentication-service.interface';
+import {SessionData} from "../interfaces/session/session-data.interface";
+import {UserCreationAttributes} from "../interfaces/user/user.interface";
 
-interface LoginData {
-    user_name: string;
-    password: string;
-}
-
-interface ResetPasswordData {
-    uuid_user: string;
-    code: string;
-    // Otros campos necesarios para reset
-}
-
-class ServicioAutenticacion {
+class AuthenticationService implements IAuthenticationService {
     private repository: AuthenticationRepository;
     private sessionService: SessionServiceClass;
     private userService: UserServiceClass;
@@ -29,81 +21,89 @@ class ServicioAutenticacion {
         this.userService = new UserServiceClass(UserModel);
     }
 
-    async Login(data: LoginData) {
-        const userExists = await this.repository.ValidateUser(data.user_name);
+    async login(data: LoginData): Promise<ServiceResponse<any>> {
+        const { user_name, password } = data;
 
+        const userExists = await this.repository.ValidateUser(user_name);
         if (!userExists) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'Wrong user',
-                isOperational: false,
-            });
+            return { success: false, error: 'Wrong user', code: 404 };
         }
 
-        const decodedPassword = this.fromBinary(Buffer.from(data.password, 'base64').toString());
-
-        const passwordValid = await this.repository.ValidatePassword(decodedPassword, data.user_name);
+        const decodedPassword = this.fromBinary(Buffer.from(password, 'base64').toString());
+        const passwordValid = await this.repository.ValidatePassword(decodedPassword, user_name);
 
         if (!passwordValid) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'Wrong password',
-                isOperational: false,
-            });
+            return { success: false, error: 'Wrong password', code: 401 };
         }
 
-        const token = jwt.sign(
-            { name: data.user_name },
-            'secreto', // idealmente usar variable de entorno
-            { expiresIn: '8h' }
-        );
+        const token = jwt.sign({ name: user_name }, 'secreto', { expiresIn: '8h' });
 
         const session = {
-            user_name: data.user_name,
+            user_name,
             user_token: token,
             active: true,
             login_date: new Date().toLocaleString('en-US', { timeZone: 'America/La_Paz' }),
+        } as SessionData;
+
+        await this.sessionService.logout(user_name);
+        const response = await this.sessionService.createSession(session);
+
+        if (!response) {
+            return { success: false, error: 'Failed to create session', code: 500 };
+        }
+
+        const user = await this.userService.getUserByName(response.data.user_name as string);
+
+        return {
+            success: true,
+            data: {
+                session: response.data,
+                user,
+                token,
+            },
         };
-
-        await this.sessionService.Logout(data.user_name);
-        const createdSession = await this.sessionService.CreateSession(session);
-        const usuario = await this.userService.GetUserByName(createdSession.user_name);
-
-        return { error: null, sesion: createdSession, usuario_registrado: usuario, isOperational: true };
     }
 
-    async Logout(data: { user_name: string }) {
-        const response = await this.sessionService.Logout(data.user_name);
-        return { response };
+    async logout(data: LogoutData): Promise<ServiceResponse<null>> {
+        const response = await this.sessionService.logout(data.user_name);
+
+        if (!response) {
+            return { success: false, error: 'Logout failed or user not found', code: 404 };
+        }
+
+        return { success: true, data: null };
     }
 
-    async ResetPassword(data: ResetPasswordData) {
-        const userExists = await this.repository.ValidateUserId(data.uuid_user);
+    async requestNewPassword(): Promise<ServiceResponse<null>> {
+        return {
+            success: false,
+            error: 'RequestNewPassword not implemented yet',
+            code: 501,
+        };
+    }
 
+    async resetPassword(data: ResetPasswordData): Promise<ServiceResponse<any>> {
+        const { uuid_user, code } = data;
+
+        const userExists = await this.repository.ValidateUserId(uuid_user);
         if (!userExists) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'Wrong user',
-                isOperational: false,
-            });
+            return { success: false, error: 'Wrong user', code: 404 };
         }
 
-        const validCode = await this.repository.ValidateCode(data.uuid_user, data.code);
-
+        const validCode = await this.repository.ValidateCode(uuid_user, code);
         if (!validCode) {
-            throw new ApiError({
-                name: 'BAD_REQUEST',
-                statusCode: httpStatusCodes.BAD_REQUEST,
-                description: 'Code error, request a new code',
-                isOperational: false,
-            });
+            return { success: false, error: 'Invalid code. Request a new one.', code: 400 };
         }
 
-        const newUser = await this.userService.ResetPassword(data);
-        return { error: null, new_user: newUser, isOperational: true };
+        const userResponse = await this.userService.getById(uuid_user);
+        const response = await this.userService.update(uuid_user, userResponse.data as UserCreationAttributes);
+
+        if (!response) return { success: false, error: 'User doesnt updated', code: 400 };
+
+        return {
+            success: true,
+            data: response.data,
+        };
     }
 
     private fromBinary(binary: string): string {
@@ -115,4 +115,4 @@ class ServicioAutenticacion {
     }
 }
 
-export default ServicioAutenticacion;
+export default AuthenticationService;

@@ -1,6 +1,6 @@
 import { Optional } from 'sequelize';
 
-export interface CattleWorkRecordAttributes {
+export interface CattleWorkSessionAttributes {
     id_cattle_work: number;
     uuid_cattle: string;
     work_session_id: string;
@@ -11,4 +11,4 @@ export interface CattleWorkRecordAttributes {
     created_at: Date;
 }
 
-export type CattleWorkRecordCreationAttributes = Optional<CattleWorkRecordAttributes, 'id_cattle_work' | 'created_at'>;
+export type CattleWorkSessionCreationAttributes = Optional<CattleWorkSessionAttributes, 'id_cattle_work' | 'created_at'>;

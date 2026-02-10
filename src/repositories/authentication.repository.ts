@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { databaseConfig } from "../config";
-import { IAuthenticationDBRepository } from "../interfaces/authentication.repository.interface";
+import { IAuthenticationDBRepository } from "../interfaces/repositories/authentication-repository.interface";
 
 class AuthenticationRepository implements IAuthenticationDBRepository {
   private pool: Pool;
@@ -11,7 +11,7 @@ class AuthenticationRepository implements IAuthenticationDBRepository {
 
   async ValidateUser(userName: string): Promise<boolean> {
     const result = await this.pool.query(
-        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE user_name = $1 AND enabled = true)',
+        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE user_name = $1 AND is_active = true)',
         [userName]
     );
     return result.rows[0].exists;

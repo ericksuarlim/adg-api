@@ -1,8 +1,8 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database/index';
-import { SessionAttributes, SessionCreationAttributes } from "../../interfaces/session.model.interface";
+import { SessionAttributes, SessionCreationAttributes } from "../../interfaces/session/session.interface";
 
-class Session extends Model<SessionAttributes, SessionCreationAttributes>
+class SessionModel extends Model<SessionAttributes, SessionCreationAttributes>
     implements SessionAttributes {
     public uuid_session!: number;
     public user_name?: string;
@@ -11,7 +11,7 @@ class Session extends Model<SessionAttributes, SessionCreationAttributes>
     public login_date?: Date;
 }
 
-Session.init(
+SessionModel.init(
     {
         uuid_session: {
             type: DataTypes.INTEGER,
@@ -43,4 +43,4 @@ Session.init(
     }
 );
 
-export default Session;
+export default SessionModel;

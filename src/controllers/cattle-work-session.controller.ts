@@ -1,22 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 
-import _CattleWorkRecord from '../database/models/cattleWorkRecord';
-import { CattleWorkRecordCreationAttributes } from '../interfaces/cattle/cattleWorkRecord.model.interface';
+import CattleWorkSessionModel from "../database/models/cattle-work-session.model";
+import CattleWorkSessionService from "../services/cattle-work-session.service";
+import {CattleWorkSessionCreationAttributes} from "../interfaces/work-session/cattle-work-session.interface";
 
 class CattleWorkSessionController {
-    private service: CattleWorkRecordService;
+    private service: CattleWorkSessionService;
 
     constructor() {
-        this.service = new CattleWorkRecordService(_CattleWorkRecord);
+        this.service = new CattleWorkSessionService(CattleWorkSessionModel);
 
-        this.getCattleWorkRecord = this.getCattleWorkRecord.bind(this);
-        this.getCattleWorkRecords = this.getCattleWorkRecords.bind(this);
-        this.createCattleWorkRecord = this.createCattleWorkRecord.bind(this);
-        this.updateCattleWorkRecord = this.updateCattleWorkRecord.bind(this);
-        this.deleteCattleWorkRecord = this.deleteCattleWorkRecord.bind(this);
+        this.getCattleWorkSession = this.getCattleWorkSession.bind(this);
+        this.getCattleWorkSessions = this.getCattleWorkSessions.bind(this);
+        this.createCattleWorkSession = this.createCattleWorkSession.bind(this);
+        this.updateCattleWorkSession = this.updateCattleWorkSession.bind(this);
+        this.deleteCattleWorkSession = this.deleteCattleWorkSession.bind(this);
     }
 
-    async getCattleWorkRecords(req: Request, res: Response, next: NextFunction) {
+    async getCattleWorkSessions(req: Request, res: Response, next: NextFunction) {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const size = parseInt(req.query.size as string) || 10;
@@ -35,10 +36,10 @@ class CattleWorkSessionController {
         }
     }
 
-    async getCattleWorkRecord(req: Request, res: Response, next: NextFunction) {
+    async getCattleWorkSession(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
-            const response = await this.service.getById(id);
+            const { id_cattle_work } = req.params;
+            const response = await this.service.getById(id_cattle_work);
 
             if (!response.success) {
                 return res.status(response.code ?? 404).json(response);
@@ -50,9 +51,9 @@ class CattleWorkSessionController {
         }
     }
 
-    async createCattleWorkRecord(req: Request, res: Response, next: NextFunction) {
+    async createCattleWorkSession(req: Request, res: Response, next: NextFunction) {
         try {
-            const body = req.body as CattleWorkRecordCreationAttributes;
+            const body = req.body as CattleWorkSessionCreationAttributes;
             const response = await this.service.create(body);
 
             if (!response.success) {
@@ -65,10 +66,10 @@ class CattleWorkSessionController {
         }
     }
 
-    async updateCattleWorkRecord(req: Request, res: Response, next: NextFunction) {
+    async updateCattleWorkSession(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
-            const response = await this.service.update(id, req.body);
+            const { id_cattle_work } = req.params;
+            const response = await this.service.update(id_cattle_work, req.body);
 
             if (!response.success) {
                 return res.status(response.code ?? 400).json(response);
@@ -80,10 +81,10 @@ class CattleWorkSessionController {
         }
     }
 
-    async deleteCattleWorkRecord(req: Request, res: Response, next: NextFunction) {
+    async deleteCattleWorkSession(req: Request, res: Response, next: NextFunction) {
         try {
-            const { id } = req.params;
-            const response = await this.service.delete(id);
+            const { id_cattle_work } = req.params;
+            const response = await this.service.delete(id_cattle_work);
 
             if (!response.success) {
                 return res.status(response.code ?? 400).json(response);

@@ -4,7 +4,7 @@ export interface CattleAttributes {
     uuid_cattle: number;
     primary_tag_number: string;
     secondary_tag_number: string;
-    birth_date: Date;
+    birthdate: Date;
     sex: string;
     status: boolean;
     color: string;

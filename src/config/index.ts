@@ -1,9 +1,9 @@
-const databaseConfig = require('./database');
-const jwtConfig = require('./jwt');
-const corsConfig = require('./cors');
-const envConfig = require('../../env');
+import databaseConfig from './database.config';
+import jwtConfig from './jwt.config';
+import corsConfig from './cors.config';
+import { envConfig } from './env.config';
 
-module.exports = {
+export {
     databaseConfig,
     jwtConfig,
     corsConfig,

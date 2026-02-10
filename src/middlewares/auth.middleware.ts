@@ -1,29 +1,42 @@
-const { verifyToken } = require('../helpers/jwtHelper');
-const ApiError = require('../errors/apiError');
-const httpStatus = require('../errors/httpStatusCodes');
+import { Response, NextFunction } from 'express';
+import { AuthRequest } from '../interfaces/middleware/auth-middleware.interface';
+import { verifyToken } from '../helpers/jwt.helper';
+import ApiError from '../errors/apiError';
+import httpStatus from '../errors/httpStatusCodes';
 
-const authenticate = (req, res, next) => {
+export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
 
     if (!authHeader) {
-        return next(new ApiError('AuthorizationHeaderMissing', httpStatus.UNAUTHORIZED, 'Access token required', true));
+        return next(new ApiError({
+            name: 'AuthorizationHeaderMissing',
+            statusCode: httpStatus.UNAUTHORIZED,
+            description: 'Access token required',
+            isOperational: true,
+        }));
     }
 
     const token = authHeader.split(' ')[1];
 
     if (!token) {
-        return next(new ApiError('TokenMissing', httpStatus.UNAUTHORIZED, 'Token not provided', true));
+        return next(new ApiError({
+            name: 'TokenMissing',
+            statusCode: httpStatus.UNAUTHORIZED,
+            description: 'Token not provided',
+            isOperational: true,
+        }));
     }
 
     try {
         const decoded = verifyToken(token);
         req.user = decoded;
         next();
-    } catch (err) {
-        return next(new ApiError('InvalidToken', httpStatus.UNAUTHORIZED, 'Token is invalid or expired', true));
+    } catch {
+        return next(new ApiError({
+            name: 'InvalidToken',
+            statusCode: httpStatus.UNAUTHORIZED,
+            description: 'Token is invalid or expired',
+            isOperational: true,
+        }));
     }
-};
-
-module.exports = {
-    authenticate,
 };

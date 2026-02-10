@@ -1,26 +1,33 @@
-import ApiError from '../errors/apiError';
-import httpStatusCodes from '../errors/httpStatusCodes';
-import { Model } from 'sequelize';
+import { ServiceResponse } from "../interfaces/common/service-response.interface";
+import { CattleAttributes, CattleCreationAttributes } from "../interfaces/cattle/cattle.interface";
+import {
+    ICreateService, IDeleteService,
+    IGetAllService,
+    IGetService,
+    IUpdateService
+} from "../interfaces/services/base-service.interface";
 
-type GeneralData = {
-    uuid_general?: number;
-    body?: any;
-};
+class CattleService implements
+    IGetAllService<CattleAttributes>,
+    IGetService<CattleAttributes>,
+    ICreateService<CattleAttributes, CattleCreationAttributes>,
+    IUpdateService<CattleAttributes, CattleCreationAttributes>,
+    IDeleteService {
+    private cattleModel: any;
 
-class GeneralService {
-    private generalModel: typeof Model;
-
-    constructor(GeneralModel: typeof Model) {
-        this.generalModel = GeneralModel;
+    constructor(CattleModel: any) {
+        this.cattleModel = CattleModel;
     }
 
-    async getAll(params: { page: number; size: number; sortBy: string; order: string }) {
+    async getAll(
+        params: { page: number; size: number; sortBy: string; order: 'ASC' | 'DESC' }
+    ): Promise<ServiceResponse<CattleAttributes[]>> {
         const { page, size, sortBy, order } = params;
 
         const offset = (page - 1) * size;
         const limit = size;
 
-        const result = await this.generalModel.findAndCountAll({
+        const result = await this.cattleModel.findAndCountAll({
             offset,
             limit,
             order: [[sortBy, order]],
@@ -28,103 +35,54 @@ class GeneralService {
 
         const totalPages = Math.ceil(result.count / size);
 
+        const plainRows: CattleAttributes[] = result.rows.map((cattle: any) =>
+            cattle.toJSON?.() ?? cattle
+        );
+
         return {
             success: true,
-            data: result.rows,
+            data: plainRows,
             pagination: {
                 totalItems: result.count,
                 totalPages,
                 currentPage: page,
-            }
-        };
+            },
+        } as ServiceResponse<CattleAttributes[]>;
     }
 
-    async createGeneral(data: GeneralData) {
-        if (!data.body) {
-            throw new ApiError({
-                name: 'BAD_REQUEST',
-                statusCode: httpStatusCodes.BAD_REQUEST,
-                description: 'Request body is required',
-                isOperational: true,
-            });
-        }
-        return await this.generalModel.create(data.body);
+    async create(cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes>> {
+        const cattle = await this.cattleModel.create(cattleBody);
+
+        return { success: true, data: cattle };
     }
 
-    async getGeneral(data: GeneralData) {
-        if (!data.uuid_general) {
-            throw new ApiError({
-                name: 'BAD_REQUEST',
-                statusCode: httpStatusCodes.BAD_REQUEST,
-                description: 'UUID general is required',
-                isOperational: true,
-            });
-        }
+    async getById(uuid_cattle: string): Promise<ServiceResponse<CattleAttributes | null>>  {
+        const cattle = await this.cattleModel.findByPk(uuid_cattle);
+        if (!cattle) return { success: false, error: 'Cattle not found', code: 404 };
 
-        const general = await this.generalModel.findByPk(data.uuid_general);
-        if (!general) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'General not found',
-                isOperational: true,
-            });
-        }
-
-        return general;
+        return { success: true, data: cattle };
     }
 
-    async deleteGeneral(data: GeneralData) {
-        if (!data.uuid_general) {
-            throw new ApiError({
-                name: 'BAD_REQUEST',
-                statusCode: httpStatusCodes.BAD_REQUEST,
-                description: 'UUID general is required',
-                isOperational: true,
-            });
-        }
+    async delete(uuid_cattle: string): Promise<ServiceResponse<null>> {
+        const cattle = await this.cattleModel.findByPk(uuid_cattle);
+        if (!cattle) return { success: false, error: 'User not found', code: 404 };
 
-        const general = await this.generalModel.findByPk(data.uuid_general);
-        if (!general) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'General not found',
-                isOperational: true,
-            });
-        }
+        await cattle.destroy();
 
-        await general.destroy();
-        return true;
+        return { success: true, data: null };
     }
 
-    async updateGeneral(data: GeneralData) {
-        if (!data.uuid_general || !data.body) {
-            throw new ApiError({
-                name: 'BAD_REQUEST',
-                statusCode: httpStatusCodes.BAD_REQUEST,
-                description: 'UUID general and body data are required',
-                isOperational: true,
-            });
-        }
-
-        const [affectedCount, updatedRows] = await this.generalModel.update(data.body, {
-            where: { uuid_general: data.uuid_general },
+    async update(uuid_cattle: string, cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes | null>> {
+        const [count, updatedCattle] = await this.cattleModel.update(cattleBody, {
+            where: { uuid_cattle },
             returning: true,
             plain: true,
         });
 
-        if (affectedCount === 0 || !updatedRows) {
-            throw new ApiError({
-                name: 'NOT_FOUND',
-                statusCode: httpStatusCodes.NOT_FOUND,
-                description: 'General not found to update',
-                isOperational: true,
-            });
-        }
+        if (count === 0) return { success: false, error: 'Cattle not found', code: 404 };
 
-        return updatedRows;
+        return { success: true, data: updatedCattle };
     }
 }
 
-export default GeneralService;
+export default CattleService;

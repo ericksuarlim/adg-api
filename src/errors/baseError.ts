@@ -1,16 +1,22 @@
 class BaseError extends Error {
-    constructor(name, statusCode, isOperational, description) {
+    name: string;
+    statusCode: number;
+    isOperational: boolean;
+    description: string;
+
+    constructor(name: string, statusCode: number, isOperational: boolean, description: string) {
         super(description);
 
         Object.setPrototypeOf(this, new.target.prototype);
 
-        this.name = name || 'Error';
-        this.statusCode = statusCode || 500;
-        this.isOperational = isOperational ?? true;
-        this.description = description || 'An unexpected error occurred.';
+        this.name = name;
+        this.statusCode = statusCode;
+        this.isOperational = isOperational;
+        this.description = description;
 
         Error.captureStackTrace(this);
     }
 }
 
-module.exports = BaseError;
+export default BaseError;
+

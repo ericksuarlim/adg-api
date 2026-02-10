@@ -1,5 +1,5 @@
 import { ServiceResponse } from '../common/service-response.interface';
-import { SessionData } from '../session-data.interface';
+import { SessionData } from '../session/session-data.interface';
 
 export interface ISessionService {
     createSession(data: SessionData): Promise<ServiceResponse<any>>;

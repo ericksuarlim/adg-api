@@ -1,10 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
-import UserService from '../services/user.service';
+import UserService from '../services/user.services';
+import UserModel from "../database/models/user.model";
+import { UserCreationAttributes } from "../interfaces/user/user.interface";
 
 class UserController {
-    private userService = new UserService();
+    private userService: UserService;
 
     constructor() {
+        this.userService = new UserService(UserModel);
+
         this.createUser = this.createUser.bind(this);
         this.getUser = this.getUser.bind(this);
         this.getUsers = this.getUsers.bind(this);
@@ -15,8 +19,14 @@ class UserController {
 
     async createUser(req: Request, res: Response, next: NextFunction) {
         try {
-            const user = await this.userService.CreateUser(req.body);
-            res.status(201).json(user);
+            const userBody = req.body as UserCreationAttributes;
+            const response = await this.userService.create(userBody);
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(201).json(response);
         } catch (error) {
             next(error);
         }
@@ -25,8 +35,13 @@ class UserController {
     async getUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { uuid_user } = req.params;
-            const user = await this.userService.GetUser(uuid_user);
-            res.status(200).json(user);
+            const response = await this.userService.getById(uuid_user);
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
@@ -34,8 +49,18 @@ class UserController {
 
     async getUsers(req: Request, res: Response, next: NextFunction) {
         try {
-            const users = await this.userService.GetUsers();
-            res.status(200).json(users);
+            const page = parseInt(req.query.page as string) || 1;
+            const size = parseInt(req.query.size as string) || 10;
+            const sortBy = (req.query.sortBy as string) || 'createdAt';
+            const order = (((req.query.order as string) || 'desc').toUpperCase() as 'ASC' | 'DESC');
+
+            const response = await this.userService.getAll({ page, size, sortBy, order });
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
@@ -44,8 +69,14 @@ class UserController {
     async updateUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { uuid_user } = req.params;
-            const updated = await this.userService.UpdateUser(uuid_user, req.body);
-            res.status(200).json(updated);
+            const userBody = req.body as UserCreationAttributes;
+            const response = await this.userService.update(uuid_user, userBody);
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
@@ -54,8 +85,13 @@ class UserController {
     async manageUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { uuid_user } = req.params;
-            const updated = await this.userService.ManageUser(uuid_user, req.body);
-            res.status(200).json(updated);
+            const response = await this.userService.manageUser(uuid_user);
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
@@ -64,8 +100,13 @@ class UserController {
     async deleteUser(req: Request, res: Response, next: NextFunction) {
         try {
             const { uuid_user } = req.params;
-            const deleted = await this.userService.DeleteUser(uuid_user);
-            res.status(200).json(deleted);
+            const response = await this.userService.delete(uuid_user);
+
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            return res.status(200).json(response);
         } catch (error) {
             next(error);
         }

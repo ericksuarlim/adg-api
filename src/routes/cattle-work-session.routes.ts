@@ -1,15 +1,14 @@
 import { Router } from 'express';
-import AttendanceController from '../controllers/cattle-work-session.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import CattleWorkSessionController from '../controllers/cattle-work-session.controller';
+
 
 const router = Router();
 
-router.use(authenticate);
 
-router.get('/', AttendanceController.getAll);
-router.get('/:id_attendance', AttendanceController.getById);
-router.post('/', AttendanceController.create);
-router.put('/:id_attendance', AttendanceController.update);
-router.delete('/:id_attendance', AttendanceController.delete);
+router.get('/', CattleWorkSessionController.getCattleWorkSessions);
+router.get('/:id_cattle_work', CattleWorkSessionController.getCattleWorkSession);
+router.post('/', CattleWorkSessionController.createCattleWorkSession);
+router.put('/:id_cattle_work', CattleWorkSessionController.updateCattleWorkSession);
+router.delete('/:id_cattle_work', CattleWorkSessionController.deleteCattleWorkSession);
 
 export default router;

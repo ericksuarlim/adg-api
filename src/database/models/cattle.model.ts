@@ -1,12 +1,12 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database';
-import { CattleAttributes, CattleCreationAttributes } from "../../interfaces/cattle/cattle.model.interface";
+import { CattleAttributes, CattleCreationAttributes } from "../../interfaces/cattle/cattle.interface";
 
 class Cattle extends Model <CattleAttributes, CattleCreationAttributes> implements CattleAttributes {
     declare uuid_cattle: number;
     declare primary_tag_number: string;
     declare secondary_tag_number: string;
-    declare birth_date: Date;
+    declare birthdate: Date;
     declare sex: string;
     declare status: boolean;
     declare color: string;
@@ -20,9 +20,9 @@ class Cattle extends Model <CattleAttributes, CattleCreationAttributes> implemen
 Cattle.init(
     {
         uuid_cattle: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
-            autoIncrement: true,
         },
         primary_tag_number: {
             type: DataTypes.INTEGER,
@@ -41,7 +41,7 @@ Cattle.init(
             allowNull: true,
         },
         status: {
-            type: DataTypes.BOOL,
+            type: DataTypes.BOOLEAN,
             allowNull: true,
         },
         detail: {

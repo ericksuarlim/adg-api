@@ -1,5 +1,5 @@
-import { CorsOptions } from '../interfaces/common/corsOption.interface';
-import { envConfig } from './env';
+import { CorsOptions } from '../interfaces/common/cors-option.interface';
+import { envConfig } from './env.config';
 
 const corsOptions: CorsOptions = {
     origin: envConfig.CORS_ORIGIN,

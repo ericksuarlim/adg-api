@@ -1,11 +1,16 @@
-import { ServiceResponse } from '../common/serviceResponse.interface';
+import { ServiceResponse } from '../common/service-response.interface';
 
 export interface IGetService<T> {
     getById(id: string): Promise<ServiceResponse<T | null>>;
 }
 
 export interface IGetAllService<T> {
-    getAll(): Promise<ServiceResponse<T[]>>;
+    getAll(params: {
+        page: number;
+        size: number;
+        sortBy: string;
+        order: 'ASC' | 'DESC';
+    }): Promise<ServiceResponse<T[]>>;
 }
 
 export interface ICreateService<T, InputDto> {

@@ -1,6 +1,6 @@
-import app from './src/app';
-import sequelize from './src/database/index';
-import {envConfig} from "./src/config";
+import app from './app';
+import sequelize from './database';
+import {envConfig} from "./config";
 
 
 sequelize.authenticate()

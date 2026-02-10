@@ -1,8 +1,8 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database';
-import { UserAttributes, UserCreationAttributes } from "../../interfaces/user/user.model.interface";
+import { UserAttributes, UserCreationAttributes } from "../../interfaces/user/user.interface";
 
-class User extends Model <UserAttributes, UserCreationAttributes>
+class UserModel extends Model <UserAttributes, UserCreationAttributes>
     implements UserAttributes {
     declare uuid_user: number;
     declare id_card: number;
@@ -17,24 +17,24 @@ class User extends Model <UserAttributes, UserCreationAttributes>
     declare is_active: boolean;
 }
 
-User.init(
+UserModel.init(
     {
         uuid_user: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
-            autoIncrement: true,
         },
         id_card: {
             type: DataTypes.INTEGER,
-            allowNull: true,
+            allowNull: false,
         },
         names: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
         first_last_name: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
         second_last_name: {
             type: DataTypes.STRING,
@@ -46,31 +46,33 @@ User.init(
         },
         email: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
         user_name: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
-        password: {
+        password_hash: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
-        role: {
-            type: DataTypes.STRING,
-            allowNull: true,
+        role_id: {
+            type: DataTypes.INTEGER,
+            defaultValue: "Admin",
+            allowNull: false,
         },
         is_active: {
             type: DataTypes.BOOLEAN,
-            allowNull: true,
+            defaultValue: true,
+            allowNull: false,
         },
     },
     {
         sequelize,
-        modelName: 'User',
+        modelName: 'user',
         freezeTableName: true,
         timestamps: false,
     }
 );
 
-export default User;
+export default UserModel;
