@@ -15,6 +15,7 @@ class Cattle extends Model <CattleAttributes, CattleCreationAttributes> implemen
     declare updated_at: Date;
     declare uuid_breed: number;
     declare uuid_location: number;
+    declare is_active: boolean;
 }
 
 Cattle.init(
@@ -68,6 +69,11 @@ Cattle.init(
             type: DataTypes.INTEGER,
             allowNull: true,
         },
+        is_active: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+        }
     },
     {
         sequelize,

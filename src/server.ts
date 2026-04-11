@@ -1,7 +1,7 @@
 import app from './app';
 import sequelize from './database';
 import {envConfig} from "./config";
-
+import './database/models';
 
 sequelize.authenticate()
     .then(() => {

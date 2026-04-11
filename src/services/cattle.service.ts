@@ -1,87 +1,131 @@
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import { CattleAttributes, CattleCreationAttributes } from "../interfaces/cattle/cattle.interface";
-import {
-    ICreateService, IDeleteService,
-    IGetAllService,
-    IGetService,
-    IUpdateService
-} from "../interfaces/services/base-service.interface";
+import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
+import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+import Cattle from "../database/models/cattle.model";
+import {Status} from "../interfaces/params/query.interface";
 
-class CattleService implements
-    IGetAllService<CattleAttributes>,
-    IGetService<CattleAttributes>,
-    ICreateService<CattleAttributes, CattleCreationAttributes>,
-    IUpdateService<CattleAttributes, CattleCreationAttributes>,
-    IDeleteService {
-    private cattleModel: any;
+class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCreationAttributes> {
 
-    constructor(CattleModel: any) {
-        this.cattleModel = CattleModel;
+    private cattleRepository: IBaseRepository<Cattle, CattleCreationAttributes>;
+
+    constructor(
+        cattleRepository: IBaseRepository<Cattle, CattleCreationAttributes>
+    ) {
+        this.cattleRepository = cattleRepository;
     }
 
-    async getAll(
-        params: { page: number; size: number; sortBy: string; order: 'ASC' | 'DESC' }
-    ): Promise<ServiceResponse<CattleAttributes[]>> {
-        const { page, size, sortBy, order } = params;
+    async getAll(params: {
+        page: number;
+        size: number;
+        sortBy: string;
+        order: 'ASC' | 'DESC';
+        status?: Status;
+    }): Promise<ServiceResponse<CattleAttributes[]>> {
 
-        const offset = (page - 1) * size;
-        const limit = size;
+        const { rows, count } = await this.cattleRepository.findAll(params);
 
-        const result = await this.cattleModel.findAndCountAll({
-            offset,
-            limit,
-            order: [[sortBy, order]],
-        });
-
-        const totalPages = Math.ceil(result.count / size);
-
-        const plainRows: CattleAttributes[] = result.rows.map((cattle: any) =>
-            cattle.toJSON?.() ?? cattle
-        );
+        const plainCattle = rows.map(cattle => cattle.get({ plain: true }));
 
         return {
             success: true,
-            data: plainRows,
+            data: plainCattle,
             pagination: {
-                totalItems: result.count,
-                totalPages,
-                currentPage: page,
-            },
-        } as ServiceResponse<CattleAttributes[]>;
+                totalItems: count,
+                totalPages: Math.ceil(count / params.size),
+                currentPage: params.page,
+                order: params.order,
+                pageSize: params.size
+            }
+        };
     }
 
     async create(cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes>> {
-        const cattle = await this.cattleModel.create(cattleBody);
+        const cattle = await this.cattleRepository.create(cattleBody);
 
-        return { success: true, data: cattle };
+        return {
+            success: true,
+            data: cattle.get({ plain: true })
+        };
     }
 
-    async getById(uuid_cattle: string): Promise<ServiceResponse<CattleAttributes | null>>  {
-        const cattle = await this.cattleModel.findByPk(uuid_cattle);
-        if (!cattle) return { success: false, error: 'Cattle not found', code: 404 };
+    async getById(params: { id: string }): Promise<ServiceResponse<CattleAttributes>> {
+        const { id } = params;
 
-        return { success: true, data: cattle };
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Cattle ID is required'
+            });
+        }
+
+        const cattle = await this.cattleRepository.findById({ id });
+
+        if (!cattle) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Cattle not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: cattle.get({ plain: true })
+        };
     }
 
-    async delete(uuid_cattle: string): Promise<ServiceResponse<null>> {
-        const cattle = await this.cattleModel.findByPk(uuid_cattle);
-        if (!cattle) return { success: false, error: 'User not found', code: 404 };
+    async update(id: string, cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes>> {
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Cattle ID is required'
+            });
+        }
 
-        await cattle.destroy();
+        const updated = await this.cattleRepository.update(id, cattleBody);
 
-        return { success: true, data: null };
+        if (!updated) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Cattle not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: updated.get({ plain: true })
+        };
     }
 
-    async update(uuid_cattle: string, cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes | null>> {
-        const [count, updatedCattle] = await this.cattleModel.update(cattleBody, {
-            where: { uuid_cattle },
-            returning: true,
-            plain: true,
-        });
+    async delete(id: string): Promise<ServiceResponse<null>> {
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Cattle ID is required'
+            });
+        }
 
-        if (count === 0) return { success: false, error: 'Cattle not found', code: 404 };
+        const deleted = await this.cattleRepository.delete(id);
 
-        return { success: true, data: updatedCattle };
+        if (!deleted) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Cattle not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: null
+        };
     }
 }
 

@@ -1,107 +1,142 @@
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import {
-    ICreateService,
-    IDeleteService,
-    IGetAllService,
-    IGetService,
-    IUpdateService
-} from "../interfaces/services/base-service.interface";
-import {
     CattleWorkSessionAttributes,
     CattleWorkSessionCreationAttributes
 } from "../interfaces/work-session/cattle-work-session.interface";
-import {UserAttributes} from "../interfaces/user/user.interface";
+import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
+import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+import CattleWorkSessionModel from "../database/models/cattle-work-session.model";
+import {Status} from "../interfaces/params/query.interface";
 
 class CattleWorkSessionService implements
-    IGetAllService<CattleWorkSessionAttributes>,
-    IGetService<CattleWorkSessionAttributes>,
-    ICreateService<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>,
-    IUpdateService<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>,
-    IDeleteService {
+    IBaseServiceInterface<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes> {
 
-    private cattleWorkSessionModel: any;
+    private repository: IBaseRepository<CattleWorkSessionModel, CattleWorkSessionCreationAttributes>;
 
-    constructor(CattleWorkSessionModel: any) {
-        this.cattleWorkSessionModel = CattleWorkSessionModel;
+    constructor(
+        repository: IBaseRepository<CattleWorkSessionModel, CattleWorkSessionCreationAttributes>
+    ) {
+        this.repository = repository;
     }
 
-    async getAll(
-        params: { page: number; size: number; sortBy: string; order: 'ASC' | 'DESC' }
-    ): Promise<ServiceResponse<CattleWorkSessionAttributes[]>> {
-        const { page, size, sortBy, order } = params;
+    async getAll(params: {
+        page: number;
+        size: number;
+        sortBy: string;
+        order: 'ASC' | 'DESC';
+        status?: Status;
+    }): Promise<ServiceResponse<CattleWorkSessionAttributes[]>> {
 
-        const offset = (page - 1) * size;
-        const limit = size;
+        const { rows, count } = await this.repository.findAll(params);
 
-        const result = await this.cattleWorkSessionModel.findAndCountAll({
-            offset,
-            limit,
-            order: [[sortBy, order]],
-        });
-
-        const totalPages = Math.ceil(result.count / size);
-
-        const plainRows: CattleWorkSessionAttributes[] = result.rows.map((attendance: any) =>
-            attendance.toJSON?.() ?? attendance
-        );
+        const plainRows = rows.map(item => item.get({ plain: true }));
 
         return {
             success: true,
             data: plainRows,
             pagination: {
-                totalItems: result.count,
-                totalPages,
-                currentPage: page,
-            },
-        } as ServiceResponse<CattleWorkSessionAttributes[]>;
+                totalItems: count,
+                totalPages: Math.ceil(count / params.size),
+                currentPage: params.page,
+                order: params.order,
+                pageSize: params.size
+            }
+        };
     }
 
     async create(
-        attendanceBody: CattleWorkSessionCreationAttributes
+        body: CattleWorkSessionCreationAttributes
     ): Promise<ServiceResponse<CattleWorkSessionAttributes>> {
-        const attendance = await this.cattleWorkSessionModel.create(attendanceBody);
 
-        return { success: true, data: attendance };
+        const created = await this.repository.create(body);
+
+        return {
+            success: true,
+            data: created.get({ plain: true })
+        };
     }
 
-    async getById(
-        id_attendance: string
-    ): Promise<ServiceResponse<CattleWorkSessionAttributes | null>> {
-        const attendance = await this.cattleWorkSessionModel.findByPk(id_attendance);
+    async getById(params: { id: string }): Promise<ServiceResponse<CattleWorkSessionAttributes>> {
+        const { id } = params;
 
-        if (!attendance)
-            return { success: false, error: 'Attendance not found', code: 404 };
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Work session ID is required'
+            });
+        }
 
-        return { success: true, data: attendance };
+        const item = await this.repository.findById({ id });
+
+        if (!item) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Work session not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: item.get({ plain: true })
+        };
     }
 
     async update(
-        id_attendance: string,
-        attendanceBody: CattleWorkSessionCreationAttributes
-    ): Promise<ServiceResponse<CattleWorkSessionAttributes | null>> {
-        const [count, updatedAttendance] = await this.cattleWorkSessionModel.update(attendanceBody, {
-            where: { id_attendance },
-            returning: true,
-            plain: true,
-        });
+        id: string,
+        body: CattleWorkSessionCreationAttributes
+    ): Promise<ServiceResponse<CattleWorkSessionAttributes>> {
 
-        if (count === 0)
-            return { success: false, error: 'Attendance not found', code: 404 };
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Work session ID is required'
+            });
+        }
 
-        return { success: true, data: updatedAttendance };
+        const updated = await this.repository.update(id, body);
+
+        if (!updated) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Work session not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: updated.get({ plain: true })
+        };
     }
 
-    async delete(
-        id_attendance: string
-    ): Promise<ServiceResponse<null>> {
-        const attendance = await this.cattleWorkSessionModel.findByPk(id_attendance);
+    async delete(id: string): Promise<ServiceResponse<null>> {
+        if (!id || id.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Work session ID is required'
+            });
+        }
 
-        if (!attendance)
-            return { success: false, error: 'Attendance not found', code: 404 };
+        const deleted = await this.repository.delete(id);
 
-        await attendance.destroy();
+        if (!deleted) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Work session not found'
+            });
+        }
 
-        return { success: true, data: null };
+        return {
+            success: true,
+            data: null
+        };
     }
 }
 

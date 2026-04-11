@@ -9,6 +9,7 @@ export interface CattleWorkSessionAttributes {
     observation: string;
     received_medical: boolean;
     created_at: Date;
+    is_active: boolean;
 }
 
-export type CattleWorkSessionCreationAttributes = Optional<CattleWorkSessionAttributes, 'id_cattle_work' | 'created_at'>;
+export type CattleWorkSessionCreationAttributes = Optional<CattleWorkSessionAttributes, 'id_cattle_work' | 'created_at' | 'is_active'>;

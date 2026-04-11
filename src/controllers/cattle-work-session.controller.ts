@@ -1,100 +1,78 @@
 import { Request, Response, NextFunction } from 'express';
-
-import CattleWorkSessionModel from "../database/models/cattle-work-session.model";
-import CattleWorkSessionService from "../services/cattle-work-session.service";
-import {CattleWorkSessionCreationAttributes} from "../interfaces/work-session/cattle-work-session.interface";
+import {CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes} from "../interfaces/work-session/cattle-work-session.interface";
+import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
+import { handleResponse } from '../utils/response.handler';
+import { IBaseServiceInterface } from '../interfaces/services/base-service.interface';
+import { IncludeInactiveQuery } from '../interfaces/params/query.interface';
+import { IDeleteCattleWorkSessionParams, IGetCattleWorkSessionParams, IUpdateCattleWorkSessionParams } from '../interfaces/params/cattleWorkSession.interface';
 
 class CattleWorkSessionController {
-    private service: CattleWorkSessionService;
+    private cattleWorkSessionService: IBaseServiceInterface<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>;
 
-    constructor() {
-        this.service = new CattleWorkSessionService(CattleWorkSessionModel);
-
-        this.getCattleWorkSession = this.getCattleWorkSession.bind(this);
-        this.getCattleWorkSessions = this.getCattleWorkSessions.bind(this);
-        this.createCattleWorkSession = this.createCattleWorkSession.bind(this);
-        this.updateCattleWorkSession = this.updateCattleWorkSession.bind(this);
-        this.deleteCattleWorkSession = this.deleteCattleWorkSession.bind(this);
+    constructor(cattleWorkSessionService: IBaseServiceInterface<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>) {
+        this.cattleWorkSessionService = cattleWorkSessionService;
     }
 
-    async getCattleWorkSessions(req: Request, res: Response, next: NextFunction) {
+    getCattleWorkSessions = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const page = parseInt(req.query.page as string) || 1;
-            const size = parseInt(req.query.size as string) || 10;
-            const sortBy = (req.query.sortBy as string) || 'created_at';
-            const order = (((req.query.order as string) || 'desc').toUpperCase() as 'ASC' | 'DESC');
+            const params = buildGetAllParams(req.query);
 
-            const response = await this.service.getAll({ page, size, sortBy, order });
+            const response = await this.cattleWorkSessionService.getAll(params);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (err) {
             next(err);
         }
     }
 
-    async getCattleWorkSession(req: Request, res: Response, next: NextFunction) {
+    getCattleWorkSession = async (
+        req: Request<IGetCattleWorkSessionParams, {}, {}, IncludeInactiveQuery>,
+        res: Response, next: NextFunction) => 
+    {
         try {
             const { id_cattle_work } = req.params;
-            const response = await this.service.getById(id_cattle_work);
+            const { includeInactive } = buildGetByIdParams(req.query);
 
-            if (!response.success) {
-                return res.status(response.code ?? 404).json(response);
-            }
+            const response = await this.cattleWorkSessionService.getById({id: id_cattle_work, includeInactive});
 
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (err) {
             next(err);
         }
     }
 
-    async createCattleWorkSession(req: Request, res: Response, next: NextFunction) {
+    createCattleWorkSession = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const body = req.body as CattleWorkSessionCreationAttributes;
-            const response = await this.service.create(body);
+            const response = await this.cattleWorkSessionService.create(body);
 
-            if (!response.success) {
-                return res.status(response.code ?? 400).json(response);
-            }
-
-            return res.status(201).json(response);
+            return handleResponse(res, response, 201);
         } catch (err) {
             next(err);
         }
     }
 
-    async updateCattleWorkSession(req: Request, res: Response, next: NextFunction) {
+    updateCattleWorkSession = async (req: Request<IUpdateCattleWorkSessionParams>, res: Response, next: NextFunction) => {
         try {
             const { id_cattle_work } = req.params;
-            const response = await this.service.update(id_cattle_work, req.body);
+            const response = await this.cattleWorkSessionService.update(id_cattle_work, req.body);
 
-            if (!response.success) {
-                return res.status(response.code ?? 400).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (err) {
             next(err);
         }
     }
 
-    async deleteCattleWorkSession(req: Request, res: Response, next: NextFunction) {
+    deleteCattleWorkSession = async (req: Request<IDeleteCattleWorkSessionParams>, res: Response, next: NextFunction) => {
         try {
             const { id_cattle_work } = req.params;
-            const response = await this.service.delete(id_cattle_work);
+            const response = await this.cattleWorkSessionService.delete(id_cattle_work);
 
-            if (!response.success) {
-                return res.status(response.code ?? 400).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (err) {
             next(err);
         }
     }
 }
 
-export default new CattleWorkSessionController();
+export default CattleWorkSessionController;

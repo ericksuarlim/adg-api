@@ -1,22 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
-import CattleService from '../services/cattle.service';
-import CattleModel from '../database/models/cattle.model';
-import { CattleCreationAttributes } from "../interfaces/cattle/cattle.interface";
+import { CattleAttributes, CattleCreationAttributes } from "../interfaces/cattle/cattle.interface";
+import { handleResponse } from '../utils/response.handler';
+import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
+import { IBaseServiceInterface } from '../interfaces/services/base-service.interface';
+import { IncludeInactiveQuery } from '../interfaces/params/query.interface';
+import { IDeleteCattleParams, IGetCattleParams, IUpdateCattleParams } from '../interfaces/params/cattleParams.interface';
 
 class CattleController {
-    private cattleService: CattleService;
+    private cattleService: IBaseServiceInterface<CattleAttributes, CattleCreationAttributes>;
 
-    constructor() {
-        this.cattleService = new CattleService(CattleModel);
-
-        this.createCattle = this.createCattle.bind(this);
-        this.getCattle = this.getCattle.bind(this);
-        this.getCattles = this.getCattles.bind(this);
-        this.updateCattle = this.updateCattle.bind(this);
-        this.deleteCattle = this.deleteCattle.bind(this);
+    constructor(cattleService: IBaseServiceInterface<CattleAttributes, CattleCreationAttributes>) {
+        this.cattleService = cattleService;
     }
 
-    async createCattle(req: Request, res: Response, next: NextFunction) {
+    createCattle = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const cattleBody = req.body as CattleCreationAttributes;
             const response = await this.cattleService.create(cattleBody);
@@ -25,77 +22,62 @@ class CattleController {
                 return res.status(response.code ?? 500).json(response);
             }
 
-            return res.status(201).json(response);
+            return handleResponse(res, response, 201);
         } catch (error) {
             next(error);
         }
     }
 
-    async getCattle(req: Request, res: Response, next: NextFunction) {
+    getCattle = async (
+        req: Request<IGetCattleParams, {}, {}, IncludeInactiveQuery>,
+        res: Response, next: NextFunction) => 
+    {
         try {
             const { uuid_cattle } = req.params;
-            const response = await this.cattleService.getById(uuid_cattle);
+            const { includeInactive } = buildGetByIdParams(req.query);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
+            const response = await this.cattleService.getById({id: uuid_cattle, includeInactive});
 
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (error) {
             next(error);
         }
     }
 
-    async getCattles(req: Request, res: Response, next: NextFunction) {
+    getCattles = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            console.log("Entroooo");
-            const page = parseInt(req.query.page as string) || 1;
-            const size = parseInt(req.query.size as string) || 10;
-            const sortBy = (req.query.sortBy as string) || 'createdAt';
-            const order = (((req.query.order as string) || 'desc').toUpperCase() as 'ASC' | 'DESC');
+            const params = buildGetAllParams(req.query);
 
-            const response = await this.cattleService.getAll({ page, size, sortBy, order });
+            const response = await this.cattleService.getAll(params);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (error) {
             next(error);
         }
     }
 
-    async updateCattle(req: Request, res: Response, next: NextFunction) {
+    updateCattle = async (req: Request<IUpdateCattleParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_cattle } = req.params;
             const cattleBody = req.body as CattleCreationAttributes;
             const response = await this.cattleService.update(uuid_cattle, cattleBody);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (error) {
             next(error);
         }
     }
 
-    async deleteCattle(req: Request, res: Response, next: NextFunction) {
+    deleteCattle = async (req: Request<IDeleteCattleParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_cattle } = req.params;
             const response = await this.cattleService.delete(uuid_cattle);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response);
         } catch (error) {
             next(error);
         }
     }
 }
 
-export default new CattleController();
+export default CattleController;

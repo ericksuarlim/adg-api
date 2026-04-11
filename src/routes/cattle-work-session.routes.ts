@@ -1,14 +1,12 @@
 import { Router } from 'express';
-import CattleWorkSessionController from '../controllers/cattle-work-session.controller';
+import {container} from "../containers/container";
 
+const cattleWorkSessionRoutes = Router();
 
-const router = Router();
+cattleWorkSessionRoutes.get('/', container.cattleWorkSessionController.getCattleWorkSessions);
+cattleWorkSessionRoutes.get('/:id_cattle_work', container.cattleWorkSessionController.getCattleWorkSession);
+cattleWorkSessionRoutes.post('/', container.cattleWorkSessionController.createCattleWorkSession);
+cattleWorkSessionRoutes.put('/:id_cattle_work', container.cattleWorkSessionController.updateCattleWorkSession);
+cattleWorkSessionRoutes.delete('/:id_cattle_work', container.cattleWorkSessionController.deleteCattleWorkSession);
 
-
-router.get('/', CattleWorkSessionController.getCattleWorkSessions);
-router.get('/:id_cattle_work', CattleWorkSessionController.getCattleWorkSession);
-router.post('/', CattleWorkSessionController.createCattleWorkSession);
-router.put('/:id_cattle_work', CattleWorkSessionController.updateCattleWorkSession);
-router.delete('/:id_cattle_work', CattleWorkSessionController.deleteCattleWorkSession);
-
-export default router;
+export default cattleWorkSessionRoutes;

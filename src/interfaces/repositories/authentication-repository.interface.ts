@@ -1,6 +1,6 @@
 export interface IAuthenticationDBRepository {
-    ValidateUser(userName: string): Promise<boolean>;
-    ValidatePassword(password: string, userName: string): Promise<boolean>;
-    ValidateUserId(uuidUser: string): Promise<boolean>;
-    ValidateCode(uuidUser: string, code: string): Promise<boolean>;
+    validateUser(userName: string): Promise<boolean>;
+    validatePassword(password: string, userName: string): Promise<boolean>;
+    validateUserId(uuidUser: string): Promise<boolean>;
+    validateCode(uuidUser: string, code: string): Promise<boolean>;
 }

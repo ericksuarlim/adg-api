@@ -1,26 +1,22 @@
-import { Request, Response, NextFunction } from 'express';
-import ApiError from '../errors/apiError';
-import HttpStatusCodes from '../errors/httpStatusCodes';
-import { ErrorHandler } from "../interfaces/middleware/error-middleware.interface";
+import {ErrorHandler} from "../interfaces/middleware/error-middleware.interface";
+import {mapErrorHelper} from "../helpers/map-error.helper";
 
 const errorHandler: ErrorHandler = (err, req, res, next) => {
-    if (err instanceof ApiError) {
-        return res.status(err.statusCode).json({
-            error: {
-                name: err.name,
-                message: err.description,
-                statusCode: err.statusCode,
-            },
-        });
-    }
+    const mappedError = mapErrorHelper(err);
 
-    console.error('UNHANDLED ERROR:', err);
+    console.error('ERROR:', {
+        original: err,
+        mapped: mappedError,
+        path: req.originalUrl,
+        method: req.method,
+    });
 
-    return res.status(HttpStatusCodes.INTERNAL_SERVER_ERROR).json({
+    return res.status(mappedError.statusCode).json({
+        success: false,
         error: {
-            name: 'InternalServerError',
-            message: 'Algo salió mal. Intenta nuevamente.',
-            statusCode: 500,
+            name: mappedError.name,
+            message: mappedError.description,
+            statusCode: mappedError.statusCode,
         },
     });
 };

@@ -1,11 +1,11 @@
 import { Router } from 'express';
-import AuthenticationController from '../controllers/authentication.controller';
+import {container} from "../containers/container";
 
-const router = Router();
+const authenticationRoutes = Router();
 
-router.post('/new-password', AuthenticationController.requestNewPassword);
-router.post('/reset-password', AuthenticationController.resetPassword);
-router.post('/login', AuthenticationController.login);
-router.post('/logout', AuthenticationController.logout);
+authenticationRoutes.post('/new-password', container.authenticationController.requestNewPassword);
+authenticationRoutes.post('/reset-password', container.authenticationController.resetPassword);
+authenticationRoutes.post('/login', container.authenticationController.login);
+authenticationRoutes.post('/logout', container.authenticationController.logout);
 
-export default router;
+export default authenticationRoutes;

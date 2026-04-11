@@ -1,106 +1,254 @@
-import UserRepository from '../repositories/user.repository';
-import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
-import {ServiceResponse} from "../interfaces/common/service-response.interface";
-import {
-    ICreateService, IDeleteService,
-    IGetAllService,
-    IGetService,
-    IUpdateService
-} from "../interfaces/services/base-service.interface";
-import {IUserByNameService, IUserManageService} from "../interfaces/services/user-service.interface";
+import { UserAttributes, UserCreationAttributes } from "../interfaces/user/user.interface";
+import { ServiceResponse } from "../interfaces/common/service-response.interface";
+import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
+import { IUserManagerRepository } from "../interfaces/repositories/user-repository.interface";
+import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+import bcrypt from "bcryptjs";
+import {UserModel} from "../database/models";
+import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
+import {CompanyAttributes, CompanyCreationAttributes} from "../interfaces/company/company.interface";
+import {Status} from "../interfaces/params/query.interface";
+import {IPasswordValidatorService} from "../interfaces/services/password-validator-service.interface";
 
 class UserService implements
-    IGetAllService<UserAttributes>,
-    IGetService<UserAttributes>,
-    ICreateService<UserAttributes, UserCreationAttributes>,
-    IUpdateService<UserAttributes, UserCreationAttributes>,
-    IDeleteService,
-    IUserManageService,
-    IUserByNameService {
+    IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
+    IUserManagerServiceInterface<UserAttributes> {
 
-    private repository: UserRepository;
-    private userModel: any;
+    private userRepository: IBaseRepository<UserModel, UserCreationAttributes>;
+    private userManagerRepository: IUserManagerRepository<UserModel>;
+    private companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
+    private passwordValidatorService: IPasswordValidatorService;
 
-    constructor(UserModel: any) {
-        this.repository = new UserRepository();
-        this.userModel = UserModel;
+    constructor(
+        userRepository: IBaseRepository<UserModel, UserCreationAttributes>,
+        userManagerRepository: IUserManagerRepository<UserModel>,
+        companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>,
+        passwordValidatorService: IPasswordValidatorService
+    ) {
+        this.userRepository = userRepository;
+        this.userManagerRepository = userManagerRepository;
+        this.companyService = companyService;
+        this.passwordValidatorService = passwordValidatorService;
     }
 
-    async getAll(
-        params: { page: number; size: number; sortBy: string; order: 'ASC' | 'DESC' }
-    ): Promise<ServiceResponse<UserAttributes[]>> {
-        const { page, size, sortBy, order } = params;
+    async getAll(params: {
+        page: number;
+        size: number;
+        sortBy: string;
+        order: 'ASC' | 'DESC';
+        status?: Status;
+    }): Promise<ServiceResponse<UserAttributes[]>> {
+        const {rows, count} = await this.userRepository.findAll(params);
 
-        const offset = (page - 1) * size;
-        const limit = size;
-
-        const result = await this.userModel.findAndCountAll({
-            offset,
-            limit,
-            order: [[sortBy, order]],
-        });
-
-        const totalPages = Math.ceil(result.count / size);
-
-        const plainRows: UserAttributes[] = result.rows.map((user: any) =>
-            user.toJSON?.() ?? user
-        );
+        const plainUsers = rows.map(user => user.get({plain: true}));
 
         return {
             success: true,
-            data: plainRows,
+            data: plainUsers,
             pagination: {
-                totalItems: result.count,
-                totalPages,
-                currentPage: page,
-            },
-        } as ServiceResponse<UserAttributes[]>;
+                totalItems: count,
+                totalPages: Math.ceil(count / params.size),
+                currentPage: params.page,
+                order: params.order,
+                pageSize: params.size
+            }
+        };
     }
-
 
     async create(userBody: UserCreationAttributes): Promise<ServiceResponse<UserAttributes>> {
-        const user = await this.userModel.create(userBody);
+        if (!userBody.password) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Password is required'
+            });
+        }
 
-        return { success: true, data: user };
+        const companyResponse = await this.companyService.getById({ id: userBody.company_id });
+
+        if (!companyResponse.success) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company does not exist'
+            });
+        }
+
+        this.passwordValidatorService.validate(userBody.password);
+
+        const hashedPassword = await bcrypt.hash(userBody.password, 10);
+
+        const user = await this.userRepository.create({
+            ...userBody,
+            password: hashedPassword
+        });
+
+        return {
+            success: true,
+            data: user.get({ plain: true })
+        };
     }
 
-    async getById(uuid_user: string): Promise<ServiceResponse<UserAttributes | null>> {
-        const user = await this.userModel.findByPk(uuid_user);
-        if (!user) return { success: false, error: 'User not found', code: 404 };
+    async getById(params: { id: string, includeInactive?: boolean }): Promise<ServiceResponse<UserAttributes>> {
+        const { id:uuid_user, includeInactive } = params;
 
-        return { success: true, data: user };
+        if (!uuid_user) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_user is required'
+            });
+        }
+
+        const user = await this.userRepository.findById({id: uuid_user, includeInactive});
+
+        if (!user) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: user.get({ plain: true })
+        };
+    }
+
+    async update(uuid_user: string, userBody: UserCreationAttributes): Promise<ServiceResponse<UserAttributes>> {
+        if (!uuid_user || uuid_user.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
+        }
+
+        const updatedUser = await this.userRepository.update(uuid_user, userBody);
+
+        if (!updatedUser) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found or inactive'
+            });
+        }
+
+        return {
+            success: true,
+            data: updatedUser.get({ plain: true })
+        };
     }
 
     async delete(uuid_user: string): Promise<ServiceResponse<null>> {
-        const user = await this.userModel.findByPk(uuid_user);
-        if (!user) return { success: false, error: 'User not found', code: 404 };
+        if (!uuid_user || uuid_user.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
+        }
 
-        await user.destroy();
+        const deleted = await this.userRepository.delete(uuid_user);
 
-        return { success: true, data: null };
+        if (!deleted) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found or already inactive'
+            });
+        }
+
+        return {
+            success: true,
+            data: null
+        };
     }
 
-    async update(uuid_user: string, userBody: UserCreationAttributes): Promise<ServiceResponse<UserAttributes | null>> {
-        const [count, updatedUser] = await this.userModel.update(userBody, {
-            where: { uuid_user },
-            returning: true,
-            plain: true,
-        });
+    async manageUser(uuid_user: string): Promise<ServiceResponse<UserAttributes>> {
+        if (!uuid_user || uuid_user.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
+        }
 
-        if (count === 0) return { success: false, error: 'User not found', code: 404 };
+        const user = await this.userManagerRepository.manageUser(uuid_user);
 
-        return { success: true, data: updatedUser };
+        if (!user) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: user.get({ plain: true })
+        };
     }
 
-    async manageUser(uuid_user: string): Promise<ServiceResponse<UserAttributes | null>> {
-        return await this.repository.ManageUser(uuid_user);
+    async getUserByName(username: string): Promise<ServiceResponse<UserAttributes>> {
+
+        if (!username || username.trim() === "") {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
+        }
+
+        const user = await this.userManagerRepository.findUserByName(username);
+
+        if (!user) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found'
+            });
+        }
+
+        return {
+            success: true,
+            data: user.get({ plain: true })
+        };
     }
 
-    async getUserByName(user_name: string): Promise<ServiceResponse<UserAttributes | null>>  {
-        const user = await this.userModel.findOne({ where: { user_name } });
-        if (!user) return { success: false, error: 'User not found', code: 404 };
+    async resetPassword(uuid_user: string, password: string): Promise<ServiceResponse<null>> {
+        if (!uuid_user || uuid_user.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'User Id required'
+            });
+        }
 
-        return { success: true, data: user };
+        if (!password || password.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Password is required'
+            });
+        }
+
+        const passwordReset = await this.userManagerRepository.resetPassword(uuid_user, password);
+        if (!passwordReset) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Company not found or already inactive'
+            });
+        }
+
+        return {
+            success: true,
+            data: null,
+        }
     }
 }
 

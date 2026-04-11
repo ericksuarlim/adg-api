@@ -5,5 +5,5 @@ export interface IAuthenticationService {
     login(data: LoginData): Promise<ServiceResponse<any>>;
     logout(data: LogoutData): Promise<ServiceResponse<null>>;
     requestNewPassword(): Promise<ServiceResponse<null>>;
-    resetPassword(data: ResetPasswordData): Promise<ServiceResponse<any>>;
+    resetPassword(data: ResetPasswordData): Promise<ServiceResponse<null>>;
 }

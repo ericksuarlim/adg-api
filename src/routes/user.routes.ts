@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import UserController from '../controllers/user.controller';
+import {container} from "../containers/container";
 
 const userRoutes = Router();
 
-userRoutes.post('/', UserController.createUser);
-userRoutes.get('/:uuid_user', UserController.getUser);
-userRoutes.get('/', UserController.getUsers);
-userRoutes.put('/:uuid_user', UserController.updateUser);
-userRoutes.put('/manage/:uuid_user', UserController.manageUser);
-userRoutes.delete('/:uuid_user', UserController.deleteUser);
+userRoutes.post('/', container.userController.createUser);
+userRoutes.get('/:uuid_user', container.userController.getUser);
+userRoutes.get('/', container.userController.getUsers);
+userRoutes.put('/:uuid_user', container.userController.updateUser);
+userRoutes.put('/manage/:uuid_user', container.userController.manageUser);
+userRoutes.delete('/:uuid_user', container.userController.deleteUser);
 
 export default userRoutes;

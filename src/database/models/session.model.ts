@@ -4,42 +4,44 @@ import { SessionAttributes, SessionCreationAttributes } from "../../interfaces/s
 
 class SessionModel extends Model<SessionAttributes, SessionCreationAttributes>
     implements SessionAttributes {
-    public uuid_session!: number;
-    public user_name?: string;
-    public user_token?: string;
-    public active?: boolean;
-    public login_date?: Date;
+    declare uuid_session: number;
+    declare user_name: string;
+    declare user_token: string;
+    declare is_active: boolean;
+    declare login_date: Date;
 }
 
 SessionModel.init(
     {
         uuid_session: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
+            defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
-            autoIncrement: true,
         },
         user_name: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
         user_token: {
             type: DataTypes.STRING,
-            allowNull: true,
+            allowNull: false,
         },
-        active: {
+        is_active: {
             type: DataTypes.BOOLEAN,
-            allowNull: true,
+            allowNull: false,
+            defaultValue: true,
         },
         login_date: {
             type: DataTypes.DATE,
-            allowNull: true,
+            allowNull: false,
         },
     },
     {
         sequelize,
+        tableName: 'sessions',
         modelName: 'Session',
-        freezeTableName: true,
-        timestamps: false,
+        underscored: true,
+        timestamps: true,
     }
 );
 

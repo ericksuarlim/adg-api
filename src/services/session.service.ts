@@ -1,45 +1,70 @@
-import schedule, { Job } from 'node-schedule';
-import SessionRepository from '../repositories/session.repository';
 import { ServiceResponse } from '../interfaces/common/service-response.interface';
-import { SessionData } from '../interfaces/session/session-data.interface';
 import { ISessionService } from '../interfaces/services/session-service.interface';
+import {SessionAttributes, SessionCreationAttributes} from "../interfaces/session/session.interface";
+import {ISessionRepository} from "../interfaces/repositories/session-repository.interface";
+import {Status} from "../interfaces/params/query.interface";
+import SessionModel from "../database/models/session.model";
 
-class SessionService implements ISessionService {
-    private repository: SessionRepository;
-    private sessionModel: any;
-    private deleteJob: schedule.Job;
-    private resetJob: schedule.Job;
+class SessionService implements ISessionService<SessionAttributes> {
+    private sessionRepository: ISessionRepository<SessionModel, SessionCreationAttributes>;
 
-    constructor(SessionModel: any) {
-        this.repository = new SessionRepository();
-        this.sessionModel = SessionModel;
-
-        this.deleteJob = schedule.scheduleJob('0 0 1 * *', this.deleteExpiredSession.bind(this));
-        this.resetJob = schedule.scheduleJob('0 0 * * *', this.resetSession.bind(this));
+    constructor(sessionRepository: ISessionRepository<SessionModel, SessionCreationAttributes>) {
+        this.sessionRepository = sessionRepository;
     }
 
-    private async deleteExpiredSession() {
-        await this.repository.DeleteExpiredSession();
-    }
+    async createSession(data: SessionCreationAttributes): Promise<ServiceResponse<SessionAttributes>> {
+        try {
+            const session = await this.sessionRepository.createSession(data);
 
-    private async resetSession() {
-        await this.repository.ResetSession();
-    }
-
-    async createSession(data: SessionData): Promise<ServiceResponse<any>> {
-        const session = await this.repository.CreateSession(data);
-        return { success: true, data: session };
+            return { success: true, data: session };
+        } catch (error) {
+            return { success: false, error: 'Error creating session' };
+        }
     }
 
     async logout(user_name: string): Promise<ServiceResponse<null>> {
-        const response = await this.repository.Logout(user_name);
-        if (!response) return { success: false, error: 'User not found or logout failed', code: 404 };
-        return { success: true, data: null };
+        try {
+            const response = await this.sessionRepository.logout(user_name);
+
+            if (!response) {
+                return {
+                    success: false,
+                    error: 'User not found or logout failed',
+                    code: 404
+                };
+            }
+
+            return { success: true, data: null };
+        } catch (error) {
+            return { success: false, error: 'Error during logout' };
+        }
     }
 
-    async getSessions(): Promise<ServiceResponse<SessionData[]>> {
-        const sessions = await this.repository.GetSessions();
-        return { success: true, data: sessions };
+    async getSessions(params: {
+        page: number;
+        size: number;
+        sortBy: string;
+        order: 'ASC' | 'DESC';
+        status?: Status;
+    }): Promise<ServiceResponse<SessionAttributes[]>> {
+        try {
+            const {rows, count} = await this.sessionRepository.getSessions(params);
+            const plainSessions = rows.map(session => session.get({plain: true}));
+
+            return {
+                success: true,
+                data: plainSessions,
+                pagination: {
+                    totalItems: count,
+                    totalPages: Math.ceil(count / params.size),
+                    currentPage: params.page,
+                    order: params.order,
+                    pageSize: params.size
+                }
+            };
+        } catch (error) {
+            return { success: false, error: 'Error fetching sessions' };
+        }
     }
 }
 

@@ -7,6 +7,7 @@ export interface ServiceResponse<T> {
         totalItems: number;
         totalPages: number;
         currentPage: number;
-        order: string
+        order: string;
+        pageSize: number;
     };
 }

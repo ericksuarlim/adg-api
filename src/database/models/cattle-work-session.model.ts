@@ -15,6 +15,7 @@ class CattleWorkSessionModel extends Model<CattleWorkSessionAttributes, CattleWo
     declare observation: string;
     declare received_medical: boolean;
     declare created_at: Date;
+    declare is_active: boolean;
 }
 
 CattleWorkSessionModel.init(
@@ -54,6 +55,11 @@ CattleWorkSessionModel.init(
             type: DataTypes.DATE,
             allowNull: false,
             defaultValue: DataTypes.NOW,
+        },
+        is_active: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
         },
     },
     {

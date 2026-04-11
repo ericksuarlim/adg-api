@@ -13,6 +13,7 @@ export interface CattleAttributes {
     updated_at: Date;
     uuid_breed: number;
     uuid_location: number;
+    is_active: boolean;
 }
 
-export type CattleCreationAttributes = Optional<CattleAttributes, 'uuid_cattle'>;
+export type CattleCreationAttributes = Optional<CattleAttributes, 'uuid_cattle' |'is_active'>;

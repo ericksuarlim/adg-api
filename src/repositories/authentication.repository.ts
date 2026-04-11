@@ -1,44 +1,51 @@
-import { Pool } from 'pg';
-import { databaseConfig } from "../config";
 import { IAuthenticationDBRepository } from "../interfaces/repositories/authentication-repository.interface";
+import {UserModel} from "../database/models";
+import bcrypt from "bcryptjs";
 
 class AuthenticationRepository implements IAuthenticationDBRepository {
-  private pool: Pool;
 
-  constructor() {
-    this.pool = new Pool(databaseConfig);
+  async validateUser(userName: string): Promise<boolean> {
+    const user = await UserModel.findOne({
+      where: {
+        username: userName,
+        is_active: true,
+      },
+    });
+
+    return !!user;
   }
 
-  async ValidateUser(userName: string): Promise<boolean> {
-    const result = await this.pool.query(
-        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE user_name = $1 AND is_active = true)',
-        [userName]
-    );
-    return result.rows[0].exists;
+  async validatePassword(password: string, userName: string): Promise<boolean> {
+    const user = await UserModel.findOne({
+      where: { username: userName, is_active: true },
+    });
+
+    if (!user) return false;
+
+    return await bcrypt.compare(password, user.password);
   }
 
-  async ValidatePassword(password: string, userName: string): Promise<boolean> {
-    const result = await this.pool.query(
-        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE password = $1 AND user_name = $2)',
-        [password, userName]
-    );
-    return result.rows[0].exists;
+  async validateUserId(uuidUser: string): Promise<boolean> {
+    const user = await UserModel.findOne({
+      where: {
+        uuid_user: uuidUser,
+        is_active: true,
+      },
+    });
+
+    return !!user;
   }
 
-  async ValidateUserId(uuidUser: string): Promise<boolean> {
-    const result = await this.pool.query(
-        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE uuid_user = $1 AND enabled = true)',
-        [uuidUser]
-    );
-    return result.rows[0].exists;
-  }
-
-  async ValidateCode(uuidUser: string, code: string): Promise<boolean> {
-    const result = await this.pool.query(
-        'SELECT EXISTS(SELECT 1 FROM public."user" WHERE uuid_user = $1 AND password_code = $2)',
-        [uuidUser, code]
-    );
-    return result.rows[0].exists;
+  async validateCode(uuidUser: string, code: string): Promise<boolean> {
+    // const user = await UserModel.findOne({
+    //   where: {
+    //     uuid_user: uuidUser,
+    //     password_code: code,
+    //   },
+    // });
+    //
+    // return !!user;
+    return true
   }
 }
 

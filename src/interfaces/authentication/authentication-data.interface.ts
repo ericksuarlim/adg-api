@@ -6,7 +6,7 @@ export interface LoginData {
 export interface ResetPasswordData {
     uuid_user: string;
     code: string;
-    [key: string]: any;
+    password: any;
 }
 
 export interface LogoutData {

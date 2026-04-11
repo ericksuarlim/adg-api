@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import CattleController from '../controllers/cattle.controller';
+import {container} from "../containers/container";
 
+const cattleRoutes = Router();
 
-const router = Router();
+cattleRoutes.post('/', container.cattleController.createCattle);
+cattleRoutes.get('/:uuid_cattle', container.cattleController.getCattle);
+cattleRoutes.get('/', container.cattleController.getCattles);
+cattleRoutes.put('/:uuid_cattle', container.cattleController.updateCattle);
+cattleRoutes.delete('/:uuid_cattle', container.cattleController.deleteCattle);
 
-router.post('/', CattleController.createCattle);
-router.get('/:uuid_cattle', CattleController.getCattle);
-router.get('/', CattleController.getCattles);
-router.put('/:uuid_cattle', CattleController.updateCattle);
-router.delete('/:uuid_cattle', CattleController.deleteCattle);
-
-export default router;
+export default cattleRoutes;

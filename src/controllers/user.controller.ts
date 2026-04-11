@@ -1,116 +1,101 @@
 import { Request, Response, NextFunction } from 'express';
-import UserService from '../services/user.services';
-import UserModel from "../database/models/user.model";
-import { UserCreationAttributes } from "../interfaces/user/user.interface";
+import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
+import {IBaseServiceInterface} from "../interfaces/services/base-service.interface";
+import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
+import {
+    IDeleteUserParams,
+    IGetUserParams,
+    IManageUserParams,
+    IUpdateUserParams
+} from "../interfaces/params/userParams.interface";
+import { handleResponse } from '../utils/response.handler';
+import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
+import { IncludeInactiveQuery } from '../interfaces/params/query.interface';
 
 class UserController {
-    private userService: UserService;
+    private userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
+    private userManagerService: IUserManagerServiceInterface<UserAttributes>;
 
-    constructor() {
-        this.userService = new UserService(UserModel);
-
-        this.createUser = this.createUser.bind(this);
-        this.getUser = this.getUser.bind(this);
-        this.getUsers = this.getUsers.bind(this);
-        this.updateUser = this.updateUser.bind(this);
-        this.manageUser = this.manageUser.bind(this);
-        this.deleteUser = this.deleteUser.bind(this);
+    constructor(
+        userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
+        userManagerService: IUserManagerServiceInterface<UserAttributes>
+    ) {
+        this.userService = userService;
+        this.userManagerService = userManagerService;
     }
 
-    async createUser(req: Request, res: Response, next: NextFunction) {
+    createUser = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const userBody = req.body as UserCreationAttributes;
             const response = await this.userService.create(userBody);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(201).json(response);
+            return handleResponse(res, response, 201);
         } catch (error) {
             next(error);
         }
     }
 
-    async getUser(req: Request, res: Response, next: NextFunction) {
+    getUser = async (        
+        req: Request<IGetUserParams, {}, {}, IncludeInactiveQuery>, 
+        res: Response, next: NextFunction
+    ) => {
         try {
             const { uuid_user } = req.params;
-            const response = await this.userService.getById(uuid_user);
+            const { includeInactive } = buildGetByIdParams(req.query);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
+            const response = await this.userService.getById({ id: uuid_user, includeInactive });
 
-            return res.status(200).json(response);
+            return handleResponse(res, response, 200);
         } catch (error) {
             next(error);
         }
     }
 
-    async getUsers(req: Request, res: Response, next: NextFunction) {
+    getUsers = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const page = parseInt(req.query.page as string) || 1;
-            const size = parseInt(req.query.size as string) || 10;
-            const sortBy = (req.query.sortBy as string) || 'createdAt';
-            const order = (((req.query.order as string) || 'desc').toUpperCase() as 'ASC' | 'DESC');
+            const params = buildGetAllParams(req.query);
 
-            const response = await this.userService.getAll({ page, size, sortBy, order });
+            const response = await this.userService.getAll(params);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response, 200);
         } catch (error) {
             next(error);
         }
     }
 
-    async updateUser(req: Request, res: Response, next: NextFunction) {
+    updateUser = async (req: Request<IUpdateUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
             const userBody = req.body as UserCreationAttributes;
             const response = await this.userService.update(uuid_user, userBody);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response, 200);
         } catch (error) {
             next(error);
         }
     }
 
-    async manageUser(req: Request, res: Response, next: NextFunction) {
+    manageUser = async (req: Request<IManageUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
-            const response = await this.userService.manageUser(uuid_user);
+            const response = await this.userManagerService.manageUser(uuid_user);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response, 200);
         } catch (error) {
             next(error);
         }
     }
 
-    async deleteUser(req: Request, res: Response, next: NextFunction) {
+    deleteUser = async (req: Request<IDeleteUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
             const response = await this.userService.delete(uuid_user);
 
-            if (!response.success) {
-                return res.status(response.code ?? 500).json(response);
-            }
-
-            return res.status(200).json(response);
+            return handleResponse(res, response, 200);
         } catch (error) {
             next(error);
         }
     }
 }
 
-export default new UserController();
+export default UserController;

@@ -1,74 +1,117 @@
 import jwt from 'jsonwebtoken';
-import AuthenticationRepository from '../repositories/authentication.repository';
-import SessionServiceClass from './session.service';
-import SessionModel from '../database/models/session.model';
-import UserServiceClass from './user.services';
-import UserModel from '../database/models/user.model';
 import { ServiceResponse } from '../interfaces/common/service-response.interface';
 import { LoginData, ResetPasswordData, LogoutData } from '../interfaces/authentication/authentication-data.interface';
 import { IAuthenticationService } from '../interfaces/services/authentication-service.interface';
-import {SessionData} from "../interfaces/session/session-data.interface";
-import {UserCreationAttributes} from "../interfaces/user/user.interface";
+import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
+import {IAuthenticationDBRepository} from "../interfaces/repositories/authentication-repository.interface";
+import {ISessionService} from "../interfaces/services/session-service.interface";
+import {SessionAttributes, SessionCreationAttributes} from "../interfaces/session/session.interface";
+import {IBaseServiceInterface} from "../interfaces/services/base-service.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+import {envConfig} from "../config";
+import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
 
 class AuthenticationService implements IAuthenticationService {
-    private repository: AuthenticationRepository;
-    private sessionService: SessionServiceClass;
-    private userService: UserServiceClass;
+    private authenticationRepository: IAuthenticationDBRepository;
+    private sessionService: ISessionService<SessionAttributes>;
+    private userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
+    private SESSION_EXPIRATION_TIME = '8h';
+    private userManagerService: IUserManagerServiceInterface<UserAttributes>
 
-    constructor() {
-        this.repository = new AuthenticationRepository();
-        this.sessionService = new SessionServiceClass(SessionModel);
-        this.userService = new UserServiceClass(UserModel);
+    constructor(
+        authenticationRepository: IAuthenticationDBRepository,
+        sessionService: ISessionService<SessionAttributes>,
+        userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
+        userManagerService: IUserManagerServiceInterface<UserAttributes>
+    ) {
+        this.authenticationRepository = authenticationRepository;
+        this.sessionService = sessionService;
+        this.userService = userService;
+        this.userManagerService = userManagerService;
     }
 
     async login(data: LoginData): Promise<ServiceResponse<any>> {
         const { user_name, password } = data;
 
-        const userExists = await this.repository.ValidateUser(user_name);
-        if (!userExists) {
-            return { success: false, error: 'Wrong user', code: 404 };
+        if (!user_name || user_name.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
         }
 
-        const decodedPassword = this.fromBinary(Buffer.from(password, 'base64').toString());
-        const passwordValid = await this.repository.ValidatePassword(decodedPassword, user_name);
+        const userExists = await this.authenticationRepository.validateUser(user_name);
+
+        if (!userExists) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Wrong user'
+            });
+        }
+
+        const passwordValid = await this.authenticationRepository.validatePassword(password, user_name);
 
         if (!passwordValid) {
-            return { success: false, error: 'Wrong password', code: 401 };
+            throw new ApiError({
+                name: 'Unauthorized',
+                statusCode: HttpStatusCodes.UNAUTHORIZED,
+                description: 'Wrong password'
+            });
         }
 
-        const token = jwt.sign({ name: user_name }, 'secreto', { expiresIn: '8h' });
+        const token = jwt.sign({ name: user_name }, envConfig.JWT_SECRET, { expiresIn: this.SESSION_EXPIRATION_TIME });
 
-        const session = {
+        const session: SessionCreationAttributes = {
             user_name,
             user_token: token,
-            active: true,
-            login_date: new Date().toLocaleString('en-US', { timeZone: 'America/La_Paz' }),
-        } as SessionData;
+            is_active: true,
+            login_date: new Date(),
+        };
 
         await this.sessionService.logout(user_name);
-        const response = await this.sessionService.createSession(session);
 
-        if (!response) {
-            return { success: false, error: 'Failed to create session', code: 500 };
+        const sessionResponse = await this.sessionService.createSession(session);
+
+        if (!sessionResponse.success) {
+            throw new ApiError({
+                name: 'InternalError',
+                statusCode: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+                description: 'Failed to create session'
+            });
         }
 
-        const user = await this.userService.getUserByName(response.data.user_name as string);
+        const userResponse = await this.userManagerService.getUserByName(user_name);
 
         return {
             success: true,
             data: {
-                session: response.data,
-                user,
+                session: sessionResponse.data,
+                user: userResponse.data,
                 token,
             },
         };
     }
 
     async logout(data: LogoutData): Promise<ServiceResponse<null>> {
+        if (!data.user_name || data.user_name.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Username is required'
+            });
+        }
+
         const response = await this.sessionService.logout(data.user_name);
 
         if (!response) {
-            return { success: false, error: 'Logout failed or user not found', code: 404 };
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Logout failed or user not found'
+            });
         }
 
         return { success: true, data: null };
@@ -83,35 +126,53 @@ class AuthenticationService implements IAuthenticationService {
     }
 
     async resetPassword(data: ResetPasswordData): Promise<ServiceResponse<any>> {
-        const { uuid_user, code } = data;
+        const { uuid_user, code, password } = data;
 
-        const userExists = await this.repository.ValidateUserId(uuid_user);
+        if (!uuid_user) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_user is required'
+            });
+        }
+
+        const userExists = await this.authenticationRepository.validateUserId(uuid_user);
+
         if (!userExists) {
-            return { success: false, error: 'Wrong user', code: 404 };
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Wrong user'
+            });
         }
 
-        const validCode = await this.repository.ValidateCode(uuid_user, code);
+        const validCode = await this.authenticationRepository.validateCode(uuid_user, code);
+
         if (!validCode) {
-            return { success: false, error: 'Invalid code. Request a new one.', code: 400 };
+            throw new ApiError({
+                name: 'BadRequest',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Invalid code. Request a new one.'
+            });
         }
 
-        const userResponse = await this.userService.getById(uuid_user);
-        const response = await this.userService.update(uuid_user, userResponse.data as UserCreationAttributes);
+        const updatedUser = await this.userManagerService.resetPassword(
+            uuid_user,
+            password
+        );
 
-        if (!response) return { success: false, error: 'User doesnt updated', code: 400 };
+        if (!updatedUser.success) {
+            throw new ApiError({
+                name: 'BadRequest',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Error updating password'
+            });
+        }
 
         return {
             success: true,
-            data: response.data,
+            data: null,
         };
-    }
-
-    private fromBinary(binary: string): string {
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < bytes.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
-        return String.fromCharCode(...new Uint16Array(bytes.buffer));
     }
 }
 
