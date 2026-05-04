@@ -9,17 +9,23 @@ import {IBaseServiceInterface} from "../interfaces/services/base-service.interfa
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { handleResponse } from "../utils/response.handler";
+import { ICompanyOnboardingService } from "../interfaces/services/company-onboarding-service.interface";
+import { CompanyOnboardingData } from "../interfaces/company/company-onboarding.interface";
+import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 
 class CompanyController {
-    private companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
+    private readonly companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
+    private readonly companyOnboardingService: ICompanyOnboardingService;
 
     constructor(
-        companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>
+        companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>,
+        companyOnboardingService: ICompanyOnboardingService
     ) {
         this.companyService = companyService;
+        this.companyOnboardingService = companyOnboardingService;
     }
 
-    createCompany = async (req: Request, res: Response, next: NextFunction) => {
+    createCompany = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const reqBody = req.body as CompanyCreationAttributes;
             const response = await this.companyService.create(reqBody);
@@ -30,15 +36,30 @@ class CompanyController {
         }
     }
 
+    onboardCompanyWithOwner = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const reqBody = req.body as CompanyOnboardingData;
+            const response = await this.companyOnboardingService.onboardCompany(reqBody);
+
+            return handleResponse(res, response, 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     getCompany = async (
-        req: Request<IGetCompanyParams, {}, {}, IncludeInactiveQuery>,
+        req: AuthRequest & Request<IGetCompanyParams, {}, {}, IncludeInactiveQuery>,
         res: Response, next: NextFunction) => 
     {
         try {
             const { uuid_company } = req.params;
             const { includeInactive } = buildGetByIdParams(req.query);
 
-            const response = await this.companyService.getById({ id: uuid_company, includeInactive });
+            const response = await this.companyService.getById({
+                id: uuid_company,
+                includeInactive,
+                uuid_company: req.user?.uuid_company
+            });
 
             return handleResponse(res, response);
         } catch (error) {
@@ -46,9 +67,10 @@ class CompanyController {
         }
     }
 
-    getCompanies = async (req: Request, res: Response, next: NextFunction) => {
+    getCompanies = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const params = buildGetAllParams(req.query);
+            params.uuid_company = req.user?.uuid_company;
 
             const response = await this.companyService.getAll(params);
 
@@ -58,14 +80,15 @@ class CompanyController {
         }
     }
 
-    updateCompany = async (req: Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
+    updateCompany = async (req: AuthRequest & Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
             const reqBody = req.body as CompanyCreationAttributes;
 
             const response = await this.companyService.update(
                 uuid_company,
-                reqBody
+                reqBody,
+                { uuid_company: req.user?.uuid_company }
             );
 
             return handleResponse(res, response);
@@ -74,10 +97,10 @@ class CompanyController {
         }
     }
 
-    deleteCompany = async (req: Request<IDeleteCompanyParams>, res: Response, next: NextFunction) => {
+    deleteCompany = async (req: AuthRequest & Request<IDeleteCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
-            const response = await this.companyService.delete(uuid_company);
+            const response = await this.companyService.delete(uuid_company, { uuid_company: req.user?.uuid_company });
 
             return handleResponse(res, response);
         } catch (error) {

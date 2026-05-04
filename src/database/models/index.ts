@@ -1,63 +1,63 @@
 import UserModel from './user.model';
 import CompanyModel from './company.model';
 import RanchModel from './ranch.model';
-import RoleModel from './role.model';
 import UserRanchModel from './user-ranch.model';
+import ReferenceSampleModel from './reference-sample.model';
 
 CompanyModel.hasMany(RanchModel, {
-    foreignKey: 'company_id',
+    foreignKey: 'uuid_company',
     as: 'ranches',
 });
 
-RanchModel.belongsTo(CompanyModel, {
-    foreignKey: 'company_id',
-    as: 'company',
-});
-
 CompanyModel.hasMany(UserModel, {
-    foreignKey: 'company_id',
+    foreignKey: 'uuid_company',
     as: 'users',
 });
 
 UserModel.belongsTo(CompanyModel, {
-    foreignKey: 'company_id',
+    foreignKey: 'uuid_company',
+    as: 'company',
+});
+
+RanchModel.belongsTo(CompanyModel, {
+    foreignKey: 'uuid_company',
     as: 'company',
 });
 
 UserModel.hasMany(UserRanchModel, {
-    foreignKey: 'user_id',
+    foreignKey: 'uuid_user',
     as: 'ranch_memberships',
 });
 
 UserRanchModel.belongsTo(UserModel, {
-    foreignKey: 'user_id',
+    foreignKey: 'uuid_user',
     as: 'user',
 });
 
 RanchModel.hasMany(UserRanchModel, {
-    foreignKey: 'ranch_id',
+    foreignKey: 'uuid_ranch',
     as: 'users',
 });
 
 UserRanchModel.belongsTo(RanchModel, {
-    foreignKey: 'ranch_id',
+    foreignKey: 'uuid_ranch',
     as: 'ranch',
 });
 
-RoleModel.hasMany(UserRanchModel, {
-    foreignKey: 'role_id',
-    as: 'assignments',
+CompanyModel.hasMany(ReferenceSampleModel, {
+    foreignKey: 'uuid_company',
+    as: 'reference_samples',
 });
 
-UserRanchModel.belongsTo(RoleModel, {
-    foreignKey: 'role_id',
-    as: 'role',
+ReferenceSampleModel.belongsTo(CompanyModel, {
+    foreignKey: 'uuid_company',
+    as: 'company',
 });
 
 export {
     UserModel,
     CompanyModel,
     RanchModel,
-    RoleModel,
     UserRanchModel,
+    ReferenceSampleModel,
 };

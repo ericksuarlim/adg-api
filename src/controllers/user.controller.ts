@@ -10,11 +10,12 @@ import {
 } from "../interfaces/params/userParams.interface";
 import { handleResponse } from '../utils/response.handler';
 import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
-import { IncludeInactiveQuery } from '../interfaces/params/query.interface';
+import { IBaseParams, IncludeInactiveQuery } from '../interfaces/params/query.interface';
+import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 
 class UserController {
-    private userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
-    private userManagerService: IUserManagerServiceInterface<UserAttributes>;
+    private readonly userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
+    private readonly userManagerService: IUserManagerServiceInterface<UserAttributes>;
 
     constructor(
         userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
@@ -24,9 +25,10 @@ class UserController {
         this.userManagerService = userManagerService;
     }
 
-    createUser = async (req: Request, res: Response, next: NextFunction) => {
+    createUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const userBody = req.body as UserCreationAttributes;
+            userBody.uuid_company = req.user?.uuid_company as string;
             const response = await this.userService.create(userBody);
 
             return handleResponse(res, response, 201);
@@ -36,14 +38,18 @@ class UserController {
     }
 
     getUser = async (        
-        req: Request<IGetUserParams, {}, {}, IncludeInactiveQuery>, 
+        req: AuthRequest & Request<IGetUserParams, {}, {}, IncludeInactiveQuery>,
         res: Response, next: NextFunction
     ) => {
         try {
             const { uuid_user } = req.params;
             const { includeInactive } = buildGetByIdParams(req.query);
 
-            const response = await this.userService.getById({ id: uuid_user, includeInactive });
+            const response = await this.userService.getById({
+                id: uuid_user,
+                includeInactive,
+                uuid_company: req.user?.uuid_company
+            });
 
             return handleResponse(res, response, 200);
         } catch (error) {
@@ -51,9 +57,10 @@ class UserController {
         }
     }
 
-    getUsers = async (req: Request, res: Response, next: NextFunction) => {
+    getUsers = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
-            const params = buildGetAllParams(req.query);
+            const params = buildGetAllParams(req.query) as IBaseParams;
+            params.uuid_company = req.user?.uuid_company;
 
             const response = await this.userService.getAll(params);
 
@@ -63,11 +70,12 @@ class UserController {
         }
     }
 
-    updateUser = async (req: Request<IUpdateUserParams>, res: Response, next: NextFunction) => {
+    updateUser = async (req: AuthRequest & Request<IUpdateUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
             const userBody = req.body as UserCreationAttributes;
-            const response = await this.userService.update(uuid_user, userBody);
+            userBody.uuid_company = req.user?.uuid_company as string;
+            const response = await this.userService.update(uuid_user, userBody, { uuid_company: req.user?.uuid_company });
 
             return handleResponse(res, response, 200);
         } catch (error) {
@@ -75,9 +83,10 @@ class UserController {
         }
     }
 
-    manageUser = async (req: Request<IManageUserParams>, res: Response, next: NextFunction) => {
+    manageUser = async (req: AuthRequest & Request<IManageUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
+            await this.userService.getById({ id: uuid_user, uuid_company: req.user?.uuid_company });
             const response = await this.userManagerService.manageUser(uuid_user);
 
             return handleResponse(res, response, 200);
@@ -86,10 +95,10 @@ class UserController {
         }
     }
 
-    deleteUser = async (req: Request<IDeleteUserParams>, res: Response, next: NextFunction) => {
+    deleteUser = async (req: AuthRequest & Request<IDeleteUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
-            const response = await this.userService.delete(uuid_user);
+            const response = await this.userService.delete(uuid_user, { uuid_company: req.user?.uuid_company });
 
             return handleResponse(res, response, 200);
         } catch (error) {

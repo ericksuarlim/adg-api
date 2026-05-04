@@ -10,5 +10,5 @@ export interface ResetPasswordData {
 }
 
 export interface LogoutData {
-    user_name: string;
+    user_name?: string;
 }

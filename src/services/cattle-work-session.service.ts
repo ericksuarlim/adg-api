@@ -8,12 +8,12 @@ import { IBaseRepository } from "../interfaces/repositories/base-repository.inte
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import CattleWorkSessionModel from "../database/models/cattle-work-session.model";
-import {Status} from "../interfaces/params/query.interface";
+import {IBaseParams} from "../interfaces/params/query.interface";
 
 class CattleWorkSessionService implements
     IBaseServiceInterface<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes> {
 
-    private repository: IBaseRepository<CattleWorkSessionModel, CattleWorkSessionCreationAttributes>;
+    private readonly repository: IBaseRepository<CattleWorkSessionModel, CattleWorkSessionCreationAttributes>;
 
     constructor(
         repository: IBaseRepository<CattleWorkSessionModel, CattleWorkSessionCreationAttributes>
@@ -21,13 +21,7 @@ class CattleWorkSessionService implements
         this.repository = repository;
     }
 
-    async getAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: 'ASC' | 'DESC';
-        status?: Status;
-    }): Promise<ServiceResponse<CattleWorkSessionAttributes[]>> {
+    async getAll(params: IBaseParams): Promise<ServiceResponse<CattleWorkSessionAttributes[]>> {
 
         const { rows, count } = await this.repository.findAll(params);
 
@@ -87,7 +81,8 @@ class CattleWorkSessionService implements
 
     async update(
         id: string,
-        body: CattleWorkSessionCreationAttributes
+        body: CattleWorkSessionCreationAttributes,
+        tenantContext?: { uuid_company?: string }
     ): Promise<ServiceResponse<CattleWorkSessionAttributes>> {
 
         if (!id || id.trim() === '') {
@@ -98,7 +93,7 @@ class CattleWorkSessionService implements
             });
         }
 
-        const updated = await this.repository.update(id, body);
+        const updated = await this.repository.update(id, body, tenantContext);
 
         if (!updated) {
             throw new ApiError({
@@ -114,7 +109,7 @@ class CattleWorkSessionService implements
         };
     }
 
-    async delete(id: string): Promise<ServiceResponse<null>> {
+    async delete(id: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
         if (!id || id.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -123,7 +118,7 @@ class CattleWorkSessionService implements
             });
         }
 
-        const deleted = await this.repository.delete(id);
+        const deleted = await this.repository.delete(id, tenantContext);
 
         if (!deleted) {
             throw new ApiError({

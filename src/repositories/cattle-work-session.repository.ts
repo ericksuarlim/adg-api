@@ -39,7 +39,7 @@ class CattleWorkSessionRepository implements
     }
 
     async findById(
-        params: { id: string; includeInactive?: boolean }
+        params: { id: string; includeInactive?: boolean; uuid_company?: string }
     ): Promise<CattleWorkSessionModel | null> {
 
         const { id, includeInactive } = params;
@@ -61,7 +61,8 @@ class CattleWorkSessionRepository implements
 
     async update(
         id_cattle_work: string,
-        data: CattleWorkSessionCreationAttributes
+        data: CattleWorkSessionCreationAttributes,
+        _options?: { uuid_company?: string }
     ): Promise<CattleWorkSessionModel | null> {
 
         const [count, updated] = await CattleWorkSessionModel.update(data, {
@@ -74,7 +75,7 @@ class CattleWorkSessionRepository implements
         return updated[0];
     }
 
-    async delete(id_cattle_work: string): Promise<boolean> {
+    async delete(id_cattle_work: string, _options?: { uuid_company?: string }): Promise<boolean> {
 
         const [count] = await CattleWorkSessionModel.update(
             { is_active: false },

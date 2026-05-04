@@ -8,7 +8,7 @@ import { RanchModel } from "../database/models";
 
 class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreationAttributes> {
 
-    private ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>;
+    private readonly ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>;
 
     constructor(ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>) {
         this.ranchRepository = ranchRepository;
@@ -48,8 +48,8 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         };
     }
 
-    async getById(params: { id: string; includeInactive?: boolean }): Promise<ServiceResponse<RanchAttributes>> {
-        const { id: uuid_ranch, includeInactive } = params;
+    async getById(params: { id: string; includeInactive?: boolean; uuid_company?: string }): Promise<ServiceResponse<RanchAttributes>> {
+        const { id: uuid_ranch, includeInactive, uuid_company } = params;
 
         if (!uuid_ranch || uuid_ranch.trim() === '') {
             throw new ApiError({
@@ -59,7 +59,7 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             });
         }
 
-        const ranch = await this.ranchRepository.findById({ id: uuid_ranch, includeInactive });
+        const ranch = await this.ranchRepository.findById({ id: uuid_ranch, includeInactive, uuid_company });
 
         if (!ranch) {
             throw new ApiError({
@@ -75,7 +75,11 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         };
     }
 
-    async update(uuid_ranch: string, ranchBody: RanchCreationAttributes): Promise<ServiceResponse<RanchAttributes>> {
+    async update(
+        uuid_ranch: string,
+        ranchBody: RanchCreationAttributes,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<RanchAttributes>> {
         if (!uuid_ranch || uuid_ranch.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -84,13 +88,13 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             });
         }
 
-        const updatedRanch = await this.ranchRepository.update(uuid_ranch, ranchBody);
+        const updatedRanch = await this.ranchRepository.update(uuid_ranch, ranchBody, tenantContext);
 
         if (!updatedRanch) {
             throw new ApiError({
                 name: 'NotFound',
                 statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'Ranch not found or inactive'
+                description: 'Problem updating ranch'
             });
         }
 
@@ -100,7 +104,7 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         };
     }
 
-    async delete(uuid_ranch: string): Promise<ServiceResponse<null>> {
+    async delete(uuid_ranch: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
         if (!uuid_ranch || uuid_ranch.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -109,7 +113,7 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             });
         }
 
-        const deleted = await this.ranchRepository.delete(uuid_ranch);
+        const deleted = await this.ranchRepository.delete(uuid_ranch, tenantContext);
 
         if (!deleted) {
             throw new ApiError({

@@ -31,6 +31,7 @@ CompanyModel.init(
         tax_id: {
             type: DataTypes.STRING,
             allowNull: true,
+            unique: true,
         },
         is_active: {
             type: DataTypes.BOOLEAN,

@@ -26,6 +26,9 @@ class UserRepository implements
         } else if (status === 'inactive') {
             where.is_active = false;
         }
+        if (params.uuid_company) {
+            where.uuid_company = params.uuid_company;
+        }
 
         return await UserModel.findAndCountAll({
             where,
@@ -35,13 +38,16 @@ class UserRepository implements
         });
     }
 
-    async findById(params: { id: string, includeInactive?: boolean }): Promise<UserModel | null> {
-        const { id, includeInactive } = params;
+    async findById(params: { id: string, includeInactive?: boolean, uuid_company?: string }): Promise<UserModel | null> {
+        const { id, includeInactive, uuid_company } = params;
 
         const where: any = { uuid_user: id };
 
-        if (includeInactive !== undefined) {
-            where.is_active = includeInactive;
+        if (!includeInactive) {
+            where.is_active = true;
+        }
+        if (uuid_company) {
+            where.uuid_company = uuid_company;
         }
 
         return await UserModel.findOne({ where });
@@ -51,9 +57,14 @@ class UserRepository implements
         return await UserModel.create(data);
     }
 
-    async update(uuid_user: string, data: UserCreationAttributes): Promise<UserModel | null> {
+    async update(uuid_user: string, data: UserCreationAttributes, options?: { uuid_company?: string }): Promise<UserModel | null> {
+        const where: any = { uuid_user, is_active: true };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
         const [count, updated] = await UserModel.update(data, {
-            where: { uuid_user, is_active: true },
+            where,
             returning: true,
         });
 
@@ -62,10 +73,15 @@ class UserRepository implements
         return updated[0];
     }
 
-    async delete(uuid_user: string): Promise<boolean> {
+    async delete(uuid_user: string, options?: { uuid_company?: string }): Promise<boolean> {
+        const where: any = { uuid_user, is_active: true };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
         const [count] = await UserModel.update(
             { is_active: false },
-            { where: { uuid_user, is_active: true } }
+            { where }
         );
 
         return count > 0;
@@ -87,7 +103,7 @@ class UserRepository implements
     async findUserByName(username: string): Promise<UserModel | null>  {
         const user = await UserModel.findOne({ where: { username, is_active: true } });
 
-        return user ? user : null;
+        return user ?? null;
     }
 
     async resetPassword(uuid_user: string, password: string): Promise<boolean> {

@@ -9,17 +9,17 @@ import bcrypt from "bcryptjs";
 import {UserModel} from "../database/models";
 import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
 import {CompanyAttributes, CompanyCreationAttributes} from "../interfaces/company/company.interface";
-import {Status} from "../interfaces/params/query.interface";
 import {IPasswordValidatorService} from "../interfaces/services/password-validator-service.interface";
+import {IBaseParams} from "../interfaces/params/query.interface";
 
 class UserService implements
     IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
     IUserManagerServiceInterface<UserAttributes> {
 
-    private userRepository: IBaseRepository<UserModel, UserCreationAttributes>;
-    private userManagerRepository: IUserManagerRepository<UserModel>;
-    private companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
-    private passwordValidatorService: IPasswordValidatorService;
+    private readonly userRepository: IBaseRepository<UserModel, UserCreationAttributes>;
+    private readonly userManagerRepository: IUserManagerRepository<UserModel>;
+    private readonly companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
+    private readonly passwordValidatorService: IPasswordValidatorService;
 
     constructor(
         userRepository: IBaseRepository<UserModel, UserCreationAttributes>,
@@ -33,13 +33,7 @@ class UserService implements
         this.passwordValidatorService = passwordValidatorService;
     }
 
-    async getAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: 'ASC' | 'DESC';
-        status?: Status;
-    }): Promise<ServiceResponse<UserAttributes[]>> {
+    async getAll(params: IBaseParams): Promise<ServiceResponse<UserAttributes[]>> {
         const {rows, count} = await this.userRepository.findAll(params);
 
         const plainUsers = rows.map(user => user.get({plain: true}));
@@ -66,7 +60,7 @@ class UserService implements
             });
         }
 
-        const companyResponse = await this.companyService.getById({ id: userBody.company_id });
+        const companyResponse = await this.companyService.getById({ id: userBody.uuid_company });
 
         if (!companyResponse.success) {
             throw new ApiError({
@@ -91,8 +85,8 @@ class UserService implements
         };
     }
 
-    async getById(params: { id: string, includeInactive?: boolean }): Promise<ServiceResponse<UserAttributes>> {
-        const { id:uuid_user, includeInactive } = params;
+    async getById(params: { id: string, includeInactive?: boolean, uuid_company?: string }): Promise<ServiceResponse<UserAttributes>> {
+        const { id:uuid_user, includeInactive, uuid_company } = params;
 
         if (!uuid_user) {
             throw new ApiError({
@@ -102,7 +96,7 @@ class UserService implements
             });
         }
 
-        const user = await this.userRepository.findById({id: uuid_user, includeInactive});
+        const user = await this.userRepository.findById({id: uuid_user, includeInactive, uuid_company});
 
         if (!user) {
             throw new ApiError({
@@ -118,7 +112,11 @@ class UserService implements
         };
     }
 
-    async update(uuid_user: string, userBody: UserCreationAttributes): Promise<ServiceResponse<UserAttributes>> {
+    async update(
+        uuid_user: string,
+        userBody: UserCreationAttributes,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<UserAttributes>> {
         if (!uuid_user || uuid_user.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -127,7 +125,7 @@ class UserService implements
             });
         }
 
-        const updatedUser = await this.userRepository.update(uuid_user, userBody);
+        const updatedUser = await this.userRepository.update(uuid_user, userBody, tenantContext);
 
         if (!updatedUser) {
             throw new ApiError({
@@ -143,7 +141,7 @@ class UserService implements
         };
     }
 
-    async delete(uuid_user: string): Promise<ServiceResponse<null>> {
+    async delete(uuid_user: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
         if (!uuid_user || uuid_user.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -152,7 +150,7 @@ class UserService implements
             });
         }
 
-        const deleted = await this.userRepository.delete(uuid_user);
+        const deleted = await this.userRepository.delete(uuid_user, tenantContext);
 
         if (!deleted) {
             throw new ApiError({
@@ -236,7 +234,10 @@ class UserService implements
             });
         }
 
-        const passwordReset = await this.userManagerRepository.resetPassword(uuid_user, password);
+        this.passwordValidatorService.validate(password);
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const passwordReset = await this.userManagerRepository.resetPassword(uuid_user, hashedPassword);
         if (!passwordReset) {
             throw new ApiError({
                 name: 'NotFound',

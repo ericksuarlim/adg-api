@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import {LoginData, LogoutData, ResetPasswordData} from "../interfaces/authentication/authentication-data.interface";
 import {handleResponse} from "../utils/response.handler";
 import {IAuthenticationService} from "../interfaces/services/authentication-service.interface";
+import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 
 class AuthenticationController {
-    private authenticationService: IAuthenticationService;
+    private readonly authenticationService: IAuthenticationService;
 
     constructor(authenticationService: IAuthenticationService) {
         this.authenticationService = authenticationService;
@@ -42,10 +43,10 @@ class AuthenticationController {
         }
     }
 
-    logout = async (req: Request, res: Response, next: NextFunction) => {
+    logout = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const logoutData = req.body as LogoutData;
-            const response = await this.authenticationService.logout(logoutData);
+            const response = await this.authenticationService.logout(logoutData, req.user?.username);
 
             return handleResponse(res, response);
         } catch (error) {

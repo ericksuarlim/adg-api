@@ -11,4 +11,5 @@ export const envConfig = {
     PORT: process.env.PORT || '3000',
     JWT_SECRET: process.env.JWT_SECRET || '',
     CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:4200',
+    PLATFORM_ONBOARDING_KEY: process.env.PLATFORM_ONBOARDING_KEY || '',
 };

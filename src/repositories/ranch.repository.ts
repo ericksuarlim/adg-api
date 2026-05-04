@@ -24,6 +24,9 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         } else if (status === 'inactive') {
             where.is_active = false;
         }
+        if (params.uuid_company) {
+            where.uuid_company = params.uuid_company;
+        }
 
         return await RanchModel.findAndCountAll({
             where,
@@ -33,13 +36,16 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         });
     }
 
-    async findById(params: { id: string; includeInactive?: boolean }): Promise<RanchModel | null> {
-        const { id: uuid_ranch, includeInactive } = params;
+    async findById(params: { id: string; includeInactive?: boolean, uuid_company?: string }): Promise<RanchModel | null> {
+        const { id: uuid_ranch, includeInactive, uuid_company } = params;
 
         const where: any = { uuid_ranch };
 
         if (!includeInactive) {
             where.is_active = true;
+        }
+        if (uuid_company) {
+            where.uuid_company = uuid_company;
         }
 
         return await RanchModel.findOne({ where });
@@ -49,9 +55,14 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         return await RanchModel.create(data);
     }
 
-    async update(uuid_ranch: string, data: RanchCreationAttributes): Promise<RanchModel | null> {
+    async update(uuid_ranch: string, data: RanchCreationAttributes, options?: { uuid_company?: string }): Promise<RanchModel | null> {
+        const where: any = { uuid_ranch, is_active: true };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
         const [count, updatedRanch] = await RanchModel.update(data, {
-            where: { uuid_ranch, is_active: true },
+            where,
             returning: true,
         });
 
@@ -60,10 +71,15 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         return updatedRanch[0];
     }
 
-    async delete(uuid_ranch: string): Promise<boolean> {
+    async delete(uuid_ranch: string, options?: { uuid_company?: string }): Promise<boolean> {
+        const where: any = { uuid_ranch, is_active: true };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
         const [count] = await RanchModel.update(
             { is_active: false },
-            { where: { uuid_ranch, is_active: true } }
+            { where }
         );
 
         return count > 0;

@@ -5,11 +5,11 @@ import { IBaseRepository } from "../interfaces/repositories/base-repository.inte
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import Cattle from "../database/models/cattle.model";
-import {Status} from "../interfaces/params/query.interface";
+import {IBaseParams} from "../interfaces/params/query.interface";
 
 class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCreationAttributes> {
 
-    private cattleRepository: IBaseRepository<Cattle, CattleCreationAttributes>;
+    private readonly cattleRepository: IBaseRepository<Cattle, CattleCreationAttributes>;
 
     constructor(
         cattleRepository: IBaseRepository<Cattle, CattleCreationAttributes>
@@ -17,13 +17,7 @@ class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCre
         this.cattleRepository = cattleRepository;
     }
 
-    async getAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: 'ASC' | 'DESC';
-        status?: Status;
-    }): Promise<ServiceResponse<CattleAttributes[]>> {
+    async getAll(params: IBaseParams): Promise<ServiceResponse<CattleAttributes[]>> {
 
         const { rows, count } = await this.cattleRepository.findAll(params);
 
@@ -78,7 +72,11 @@ class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCre
         };
     }
 
-    async update(id: string, cattleBody: CattleCreationAttributes): Promise<ServiceResponse<CattleAttributes>> {
+    async update(
+        id: string,
+        cattleBody: CattleCreationAttributes,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<CattleAttributes>> {
         if (!id || id.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -87,7 +85,7 @@ class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCre
             });
         }
 
-        const updated = await this.cattleRepository.update(id, cattleBody);
+        const updated = await this.cattleRepository.update(id, cattleBody, tenantContext);
 
         if (!updated) {
             throw new ApiError({
@@ -103,7 +101,7 @@ class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCre
         };
     }
 
-    async delete(id: string): Promise<ServiceResponse<null>> {
+    async delete(id: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
         if (!id || id.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -112,7 +110,7 @@ class CattleService implements IBaseServiceInterface<CattleAttributes, CattleCre
             });
         }
 
-        const deleted = await this.cattleRepository.delete(id);
+        const deleted = await this.cattleRepository.delete(id, tenantContext);
 
         if (!deleted) {
             throw new ApiError({

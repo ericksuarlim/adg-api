@@ -9,9 +9,21 @@ export function parseNumber(value: QueryValue, defaultValue: number): number {
     return isNaN(parsed) ? defaultValue : parsed;
 }
 
-export function parseBoolean(value: QueryValue): boolean {
+export function parseBoolean(value: unknown): boolean {
     if (Array.isArray(value)) return false;
-    return value === 'true';
+
+    if (typeof value === 'boolean') return value;
+
+    if (typeof value === 'string') {
+        const normalized = value.toLowerCase();
+        return normalized === 'true' || normalized === '1';
+    }
+
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+
+    return false;
 }
 
 export function parseOrder(value: QueryValue): Order {

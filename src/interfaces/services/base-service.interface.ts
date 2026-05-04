@@ -1,5 +1,5 @@
 import { ServiceResponse } from '../common/service-response.interface';
-import {Order, Status} from "../params/query.interface";
+import {IBaseParams} from "../params/query.interface";
 
 export interface IGetService<T> {
     getById(id: string): Promise<ServiceResponse<T | null>>;
@@ -27,15 +27,9 @@ export interface IDeleteService {
 }
 
 export interface IBaseServiceInterface<T, C> {
-    getById(params: { id: string | number, includeInactive?: boolean }): Promise<ServiceResponse<T | null>>;
-    getAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: Order;
-        status?: Status;
-    }): Promise<ServiceResponse<T[]>>;
+    getById(params: { id: string | number, includeInactive?: boolean, uuid_company?: string }): Promise<ServiceResponse<T | null>>;
+    getAll(params: IBaseParams): Promise<ServiceResponse<T[]>>;
     create(data: C): Promise<ServiceResponse<T>>;
-    update(id: string | number, data: C): Promise<ServiceResponse<T | null>>;
-    delete(id: string | number): Promise<ServiceResponse<null>>;
+    update(id: string | number, data: C, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<T | null>>;
+    delete(id: string | number, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>>;
 }

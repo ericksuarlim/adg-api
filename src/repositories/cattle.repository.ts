@@ -37,7 +37,7 @@ class CattleRepository implements
     }
 
     async findById(
-        params: { id: string; includeInactive?: boolean }
+        params: { id: string; includeInactive?: boolean; uuid_company?: string }
     ): Promise<Cattle | null> {
 
         const { id, includeInactive } = params;
@@ -57,7 +57,8 @@ class CattleRepository implements
 
     async update(
         uuid_cattle: string,
-        data: CattleCreationAttributes
+        data: CattleCreationAttributes,
+        _options?: { uuid_company?: string }
     ): Promise<Cattle | null> {
 
         const [count, updated] = await Cattle.update(data, {
@@ -70,7 +71,7 @@ class CattleRepository implements
         return updated[0];
     }
 
-    async delete(uuid_cattle: string): Promise<boolean> {
+    async delete(uuid_cattle: string, _options?: { uuid_company?: string }): Promise<boolean> {
 
         const [count] = await Cattle.update(
             { is_active: false },

@@ -2,33 +2,37 @@ import jwt from 'jsonwebtoken';
 import { ServiceResponse } from '../interfaces/common/service-response.interface';
 import { LoginData, ResetPasswordData, LogoutData } from '../interfaces/authentication/authentication-data.interface';
 import { IAuthenticationService } from '../interfaces/services/authentication-service.interface';
-import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
+import {UserAttributes} from "../interfaces/user/user.interface";
 import {IAuthenticationDBRepository} from "../interfaces/repositories/authentication-repository.interface";
 import {ISessionService} from "../interfaces/services/session-service.interface";
 import {SessionAttributes, SessionCreationAttributes} from "../interfaces/session/session.interface";
-import {IBaseServiceInterface} from "../interfaces/services/base-service.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import {envConfig} from "../config";
 import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
+import { UserRole } from "../interfaces/roles/roles.interface";
+import { SESSION_EXPIRATION_TIME } from "../constants/auth.constants";
+import { IMembershipRepository } from "../interfaces/repositories/membership-repository.interface";
+import { UserRanchModel } from "../database/models";
+import { UserRanchCreationAttributes } from "../interfaces/ranch/user-ranch.interface";
 
 class AuthenticationService implements IAuthenticationService {
-    private authenticationRepository: IAuthenticationDBRepository;
-    private sessionService: ISessionService<SessionAttributes>;
-    private userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
-    private SESSION_EXPIRATION_TIME = '8h';
-    private userManagerService: IUserManagerServiceInterface<UserAttributes>
+    private readonly authenticationRepository: IAuthenticationDBRepository;
+    private readonly sessionService: ISessionService<SessionAttributes>;
+    private readonly SESSION_EXPIRATION_TIME = SESSION_EXPIRATION_TIME;
+    private readonly userManagerService: IUserManagerServiceInterface<UserAttributes>;
+    private readonly membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>;
 
     constructor(
         authenticationRepository: IAuthenticationDBRepository,
         sessionService: ISessionService<SessionAttributes>,
-        userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
-        userManagerService: IUserManagerServiceInterface<UserAttributes>
+        userManagerService: IUserManagerServiceInterface<UserAttributes>,
+        membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>
     ) {
         this.authenticationRepository = authenticationRepository;
         this.sessionService = sessionService;
-        this.userService = userService;
         this.userManagerService = userManagerService;
+        this.membershipRepository = membershipRepository;
     }
 
     async login(data: LoginData): Promise<ServiceResponse<any>> {
@@ -62,7 +66,34 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
-        const token = jwt.sign({ name: user_name }, envConfig.JWT_SECRET, { expiresIn: this.SESSION_EXPIRATION_TIME });
+        const userResponse = await this.userManagerService.getUserByName(user_name);
+        const user = userResponse.data;
+
+        if (!userResponse.success || !user) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found'
+            });
+        }
+        const membershipRoles = await this.membershipRepository.findActiveRolesByUser(
+            user.uuid_user,
+            user.uuid_company
+        );
+        const roles = membershipRoles.length > 0
+            ? membershipRoles
+            : [UserRole.USER];
+
+        const token = jwt.sign(
+            {
+                sub: user.uuid_user,
+                username: user.username,
+                uuid_company: user.uuid_company,
+                roles,
+            },
+            envConfig.JWT_SECRET,
+            { expiresIn: this.SESSION_EXPIRATION_TIME }
+        );
 
         const session: SessionCreationAttributes = {
             user_name,
@@ -83,8 +114,6 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
-        const userResponse = await this.userManagerService.getUserByName(user_name);
-
         return {
             success: true,
             data: {
@@ -95,8 +124,10 @@ class AuthenticationService implements IAuthenticationService {
         };
     }
 
-    async logout(data: LogoutData): Promise<ServiceResponse<null>> {
-        if (!data.user_name || data.user_name.trim() === '') {
+    async logout(data: LogoutData, currentUsername?: string): Promise<ServiceResponse<null>> {
+        const usernameToLogout = currentUsername ?? data.user_name;
+
+        if (!usernameToLogout || usernameToLogout.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
@@ -104,7 +135,7 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
-        const response = await this.sessionService.logout(data.user_name);
+        const response = await this.sessionService.logout(usernameToLogout);
 
         if (!response) {
             throw new ApiError({

@@ -2,7 +2,7 @@ import { Optional } from "sequelize";
 
 export interface UserAttributes {
     uuid_user: string;
-    company_id: string,
+    uuid_company: string,
 
     id_card: string;
     first_name: string;

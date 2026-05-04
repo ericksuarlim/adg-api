@@ -7,8 +7,8 @@ export interface RanchAttributes {
     location?: string | null;
     area?: string | null;
     is_active: boolean;
-    created_at: Date;
-    updated_at: Date;
+    created_at?: Date;
+    updated_at?: Date;
 }
 
 export type RanchCreationAttributes = Optional<RanchAttributes, 'uuid_ranch' | 'location' | 'area' | 'is_active' | 'created_at' | 'updated_at'>;

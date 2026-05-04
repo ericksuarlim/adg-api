@@ -5,18 +5,18 @@ import {Status} from "../interfaces/params/query.interface";
 import SessionModel from "../database/models/session.model";
 
 class SessionRepository implements ISessionRepository<SessionModel, SessionCreationAttributes> {
-    private MILLISECONDS_IN_SECOND = 1000;
-    private SECONDS_IN_MINUTE = 60;
-    private MINUTES_IN_HOUR = 60;
-    private HOURS_IN_DAY = 24;
-    private MILLISECONDS_IN_DAY =
+    private readonly MILLISECONDS_IN_SECOND = 1000;
+    private readonly SECONDS_IN_MINUTE = 60;
+    private readonly MINUTES_IN_HOUR = 60;
+    private readonly HOURS_IN_DAY = 24;
+    private readonly MILLISECONDS_IN_DAY =
         this.HOURS_IN_DAY * this.MINUTES_IN_HOUR * this.SECONDS_IN_MINUTE * this.MILLISECONDS_IN_SECOND;
 
-    private DAYS_TO_EXPIRE = 28;
-    private DAYS_TO_RESET = 1;
+    private readonly DAYS_TO_EXPIRE = 28;
+    private readonly DAYS_TO_RESET = 1;
 
-    private SESSION_EXPIRATION_TIME = this.DAYS_TO_EXPIRE * this.MILLISECONDS_IN_DAY;
-    private SESSION_RESET_TIME = this.DAYS_TO_RESET * this.MILLISECONDS_IN_DAY;
+    private readonly SESSION_EXPIRATION_TIME = this.DAYS_TO_EXPIRE * this.MILLISECONDS_IN_DAY;
+    private readonly SESSION_RESET_TIME = this.DAYS_TO_RESET * this.MILLISECONDS_IN_DAY;
 
     async createSession(data: SessionCreationAttributes): Promise<SessionModel> {
         return await SessionModel.create(data);
@@ -92,8 +92,8 @@ class SessionRepository implements ISessionRepository<SessionModel, SessionCreat
         return affectedRows > 0;
     }
 
-    private getPastDate = (days: number): Date => {
-        return new Date(Date.now() - days * this.MILLISECONDS_IN_DAY);
+    private readonly getPastDate = (milliseconds: number): Date => {
+        return new Date(Date.now() - milliseconds);
     };
 }
 

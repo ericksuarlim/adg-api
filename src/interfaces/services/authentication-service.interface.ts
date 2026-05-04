@@ -3,7 +3,7 @@ import { LoginData, LogoutData, ResetPasswordData } from '../authentication/auth
 
 export interface IAuthenticationService {
     login(data: LoginData): Promise<ServiceResponse<any>>;
-    logout(data: LogoutData): Promise<ServiceResponse<null>>;
+    logout(data: LogoutData, currentUsername?: string): Promise<ServiceResponse<null>>;
     requestNewPassword(): Promise<ServiceResponse<null>>;
     resetPassword(data: ResetPasswordData): Promise<ServiceResponse<null>>;
 }

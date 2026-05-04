@@ -5,11 +5,11 @@ import { IBaseRepository } from "../interfaces/repositories/base-repository.inte
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { CompanyModel } from "../database/models";
-import {Order, Status} from "../interfaces/params/query.interface";
+import {IBaseParams} from "../interfaces/params/query.interface";
 
 class CompanyService implements IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes> {
 
-    private companyRepository: IBaseRepository<CompanyModel, CompanyCreationAttributes>;
+    private readonly companyRepository: IBaseRepository<CompanyModel, CompanyCreationAttributes>;
 
     constructor(
         companyRepository: IBaseRepository<CompanyModel, CompanyCreationAttributes>,
@@ -17,13 +17,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         this.companyRepository = companyRepository;
     }
 
-    async getAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: Order;
-        status?: Status;
-    }): Promise<ServiceResponse<CompanyAttributes[]>> {
+    async getAll(params: IBaseParams): Promise<ServiceResponse<CompanyAttributes[]>> {
 
         const {rows, count} = await this.companyRepository.findAll(params);
 
@@ -51,8 +45,8 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         };
     }
 
-    async getById(params: { id: string, includeInactive?: boolean}): Promise<ServiceResponse<CompanyAttributes>> {
-        const { id: uuid_company, includeInactive } = params;
+    async getById(params: { id: string, includeInactive?: boolean, uuid_company?: string}): Promise<ServiceResponse<CompanyAttributes>> {
+        const { id: uuid_company, includeInactive, uuid_company: tenantCompany } = params;
 
         if (!uuid_company || uuid_company.trim() === '') {
             throw new ApiError({
@@ -62,7 +56,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             });
         }
 
-        const company = await this.companyRepository.findById({ id:uuid_company, includeInactive });
+        const company = await this.companyRepository.findById({ id:uuid_company, includeInactive, uuid_company: tenantCompany });
 
         if (!company) {
             throw new ApiError({
@@ -78,7 +72,11 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         };
     }
 
-    async update(uuid_company: string, companyBody: CompanyCreationAttributes): Promise<ServiceResponse<CompanyAttributes>> {
+    async update(
+        uuid_company: string,
+        companyBody: CompanyCreationAttributes,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<CompanyAttributes>> {
         if (!uuid_company || uuid_company.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -87,7 +85,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             });
         }
 
-        const updatedCompany = await this.companyRepository.update(uuid_company, companyBody);
+        const updatedCompany = await this.companyRepository.update(uuid_company, companyBody, tenantContext);
 
         if (!updatedCompany) {
             throw new ApiError({
@@ -103,7 +101,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         };
     }
 
-    async delete(uuid_company: string): Promise<ServiceResponse<null>> {
+    async delete(uuid_company: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
         if (!uuid_company || uuid_company.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -112,7 +110,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             });
         }
 
-        const deleted = await this.companyRepository.delete(uuid_company);
+        const deleted = await this.companyRepository.delete(uuid_company, tenantContext);
 
         if (!deleted) {
             throw new ApiError({

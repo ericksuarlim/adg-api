@@ -5,7 +5,7 @@ import { UserAttributes, UserCreationAttributes } from "../../interfaces/user/us
 class UserModel extends Model <UserAttributes, UserCreationAttributes>
     implements UserAttributes {
     declare uuid_user: string;
-    declare company_id: string;
+    declare uuid_company: string;
 
     declare id_card: string;
     declare first_name: string;
@@ -30,7 +30,7 @@ UserModel.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        company_id: {
+        uuid_company: {
             type: DataTypes.UUID,
             allowNull: false,
         },
