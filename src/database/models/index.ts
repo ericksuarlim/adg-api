@@ -3,6 +3,7 @@ import CompanyModel from './company.model';
 import RanchModel from './ranch.model';
 import UserRanchModel from './user-ranch.model';
 import ReferenceSampleModel from './reference-sample.model';
+import CompanyPaymentModel from "./company-payment.model";
 
 CompanyModel.hasMany(RanchModel, {
     foreignKey: 'uuid_company',
@@ -54,10 +55,21 @@ ReferenceSampleModel.belongsTo(CompanyModel, {
     as: 'company',
 });
 
+CompanyModel.hasMany(CompanyPaymentModel, {
+    foreignKey: 'uuid_company',
+    as: 'payments',
+});
+
+CompanyPaymentModel.belongsTo(CompanyModel, {
+    foreignKey: 'uuid_company',
+    as: 'company',
+});
+
 export {
     UserModel,
     CompanyModel,
     RanchModel,
     UserRanchModel,
     ReferenceSampleModel,
+    CompanyPaymentModel,
 };

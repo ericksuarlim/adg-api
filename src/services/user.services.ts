@@ -33,6 +33,16 @@ class UserService implements
         this.passwordValidatorService = passwordValidatorService;
     }
 
+    private getMaxUsersByPlan(planType: CompanyAttributes['plan_type']): number {
+        const limitsByPlan: Record<CompanyAttributes['plan_type'], number> = {
+            BASIC: 2,
+            PROFESSIONAL: 5,
+            PREMIUM: 10
+        };
+
+        return limitsByPlan[planType] ?? 2;
+    }
+
     async getAll(params: IBaseParams): Promise<ServiceResponse<UserAttributes[]>> {
         const {rows, count} = await this.userRepository.findAll(params);
 
@@ -67,6 +77,23 @@ class UserService implements
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
                 description: 'Company does not exist'
+            });
+        }
+
+        const company = companyResponse.data;
+        const activeUsersInCompany = await UserModel.count({
+            where: {
+                uuid_company: userBody.uuid_company,
+                is_active: true
+            }
+        });
+        const maxUsersAllowed = this.getMaxUsersByPlan(company.plan_type);
+
+        if (activeUsersInCompany >= maxUsersAllowed) {
+            throw new ApiError({
+                name: 'PlanLimitReached',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Plan ${company.plan_type} allows only ${maxUsersAllowed} active users`
             });
         }
 

@@ -12,6 +12,7 @@ import { handleResponse } from "../utils/response.handler";
 import { ICompanyOnboardingService } from "../interfaces/services/company-onboarding-service.interface";
 import { CompanyOnboardingData } from "../interfaces/company/company-onboarding.interface";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
+import { UserRole } from "../interfaces/roles/roles.interface";
 
 class CompanyController {
     private readonly companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
@@ -23,6 +24,10 @@ class CompanyController {
     ) {
         this.companyService = companyService;
         this.companyOnboardingService = companyOnboardingService;
+    }
+
+    private isSuperAdmin(req: AuthRequest): boolean {
+        return (req.user?.roles ?? []).includes(UserRole.SUPER_ADMIN);
     }
 
     createCompany = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -55,10 +60,11 @@ class CompanyController {
             const { uuid_company } = req.params;
             const { includeInactive } = buildGetByIdParams(req.query);
 
+            const tenantCompany = this.isSuperAdmin(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.getById({
                 id: uuid_company,
                 includeInactive,
-                uuid_company: req.user?.uuid_company
+                uuid_company: tenantCompany
             });
 
             return handleResponse(res, response);
@@ -70,7 +76,7 @@ class CompanyController {
     getCompanies = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const params = buildGetAllParams(req.query);
-            params.uuid_company = req.user?.uuid_company;
+            params.uuid_company = this.isSuperAdmin(req) ? undefined : req.user?.uuid_company;
 
             const response = await this.companyService.getAll(params);
 
@@ -85,10 +91,11 @@ class CompanyController {
             const { uuid_company } = req.params;
             const reqBody = req.body as CompanyCreationAttributes;
 
+            const tenantCompany = this.isSuperAdmin(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.update(
                 uuid_company,
                 reqBody,
-                { uuid_company: req.user?.uuid_company }
+                { uuid_company: tenantCompany }
             );
 
             return handleResponse(res, response);
@@ -100,7 +107,8 @@ class CompanyController {
     deleteCompany = async (req: AuthRequest & Request<IDeleteCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
-            const response = await this.companyService.delete(uuid_company, { uuid_company: req.user?.uuid_company });
+            const tenantCompany = this.isSuperAdmin(req) ? undefined : req.user?.uuid_company;
+            const response = await this.companyService.delete(uuid_company, { uuid_company: tenantCompany });
 
             return handleResponse(res, response);
         } catch (error) {

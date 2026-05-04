@@ -5,6 +5,11 @@ export interface CompanyAttributes {
     name: string;
     legal_name?: string | null;
     tax_id?: string | null;
+    plan_type: 'BASIC' | 'PROFESSIONAL' | 'PREMIUM';
+    billing_cycle: 'MONTHLY' | 'ANNUAL';
+    membership_status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+    membership_started_at?: Date | null;
+    membership_renewal_at?: Date | null;
     is_active: boolean;
     created_at?: Date;
     updated_at?: Date;

@@ -13,7 +13,7 @@ import {IUserManagerServiceInterface} from "../interfaces/services/user-service.
 import { UserRole } from "../interfaces/roles/roles.interface";
 import { SESSION_EXPIRATION_TIME } from "../constants/auth.constants";
 import { IMembershipRepository } from "../interfaces/repositories/membership-repository.interface";
-import { UserRanchModel } from "../database/models";
+import { CompanyModel, UserRanchModel } from "../database/models";
 import { UserRanchCreationAttributes } from "../interfaces/ranch/user-ranch.interface";
 
 class AuthenticationService implements IAuthenticationService {
@@ -84,12 +84,23 @@ class AuthenticationService implements IAuthenticationService {
             ? membershipRoles
             : [UserRole.USER];
 
+        const company = await CompanyModel.findOne({
+            where: {
+                uuid_company: user.uuid_company,
+                is_active: true
+            }
+        });
+
         const token = jwt.sign(
             {
                 sub: user.uuid_user,
                 username: user.username,
                 uuid_company: user.uuid_company,
                 roles,
+                membership_status: company?.membership_status,
+                membership_renewal_at: company?.membership_renewal_at
+                    ? company.membership_renewal_at.toISOString()
+                    : undefined,
             },
             envConfig.JWT_SECRET,
             { expiresIn: this.SESSION_EXPIRATION_TIME }

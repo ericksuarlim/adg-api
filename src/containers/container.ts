@@ -28,6 +28,9 @@ import CompanyOnboardingService from "../services/company-onboarding.service";
 import ReferenceSampleRepository from "../repositories/reference-sample.repository";
 import ReferenceSampleService from "../services/reference-sample.service";
 import ReferenceSampleController from "../controllers/reference-sample.controller";
+import CompanyPaymentRepository from "../repositories/company-payment.repository";
+import CompanyPaymentService from "../services/company-payment.service";
+import CompanyPaymentController from "../controllers/company-payment.controller";
 
 //Repositories
 const companyRepository = new CompanyRepository();
@@ -40,6 +43,7 @@ const authenticationRepository = new AuthenticationRepository();
 const membershipRepository = new MembershipRepository();
 const companyOnboardingRepository = new CompanyOnboardingRepository();
 const referenceSampleRepository = new ReferenceSampleRepository();
+const companyPaymentRepository = new CompanyPaymentRepository();
 
 //Services
 const passwordValidatorService = new PasswordValidatorService();
@@ -63,6 +67,7 @@ const companyOnboardingService = new CompanyOnboardingService(
     passwordValidatorService
 );
 const referenceSampleService = new ReferenceSampleService(referenceSampleRepository);
+const companyPaymentService = new CompanyPaymentService(companyPaymentRepository, companyService);
 
 //Controllers
 const userController = new UserController(userService, userService);
@@ -73,6 +78,7 @@ const cattleWorkSessionController = new CattleWorkSessionController(cattleWorkSe
 const authenticationController = new AuthenticationController(authenticationService);
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
+const companyPaymentController = new CompanyPaymentController(companyPaymentService);
 
 export const container = {
     userController,
@@ -82,5 +88,6 @@ export const container = {
     cattleWorkSessionController,
     authenticationController,
     membershipController,
-    referenceSampleController
+    referenceSampleController,
+    companyPaymentController
 }

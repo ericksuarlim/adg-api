@@ -18,7 +18,7 @@ export enum Permission {
 }
 
 export const PERMISSION_ROLE_MAP: Record<Permission, UserRole[]> = {
-    [Permission.COMPANY_READ]: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
+    [Permission.COMPANY_READ]: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
     [Permission.COMPANY_WRITE]: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
     [Permission.USER_READ]: [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN],
     [Permission.USER_WRITE]: [UserRole.ADMIN, UserRole.SUPER_ADMIN],
