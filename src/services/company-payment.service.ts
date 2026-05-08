@@ -11,6 +11,8 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
 import { CompanyModel } from "../database/models";
+import { BillingCycle, PAYMENT_METHODS } from "../constants/domain.constants";
+import { ANNUAL_DISCOUNT_PERCENT, PLAN_PRICES_BS } from "../constants/subscription.constants";
 
 class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttributes, CompanyPaymentCreationAttributes> {
     private readonly companyPaymentRepository: IBaseRepository<CompanyPaymentModel, CompanyPaymentCreationAttributes>;
@@ -24,7 +26,7 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
         this.companyService = companyService;
     }
 
-    private calculateNextRenewalDate(fromDate: Date, billingCycle: 'MONTHLY' | 'ANNUAL'): Date {
+    private calculateNextRenewalDate(fromDate: Date, billingCycle: BillingCycle): Date {
         const renewalDate = new Date(fromDate);
         if (billingCycle === 'ANNUAL') {
             renewalDate.setFullYear(renewalDate.getFullYear() + 1);
@@ -32,6 +34,16 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
             renewalDate.setMonth(renewalDate.getMonth() + 1);
         }
         return renewalDate;
+    }
+
+    private calculateActivationAmount(planType: CompanyPaymentAttributes['plan_type'], billingCycle: BillingCycle): number {
+        const monthlyPrice = PLAN_PRICES_BS[planType];
+        if (billingCycle === 'ANNUAL') {
+            const annualBase = monthlyPrice * 12;
+            const discountedAnnual = annualBase * (1 - ANNUAL_DISCOUNT_PERCENT / 100);
+            return Number(discountedAnnual.toFixed(2));
+        }
+        return monthlyPrice;
     }
 
     async getAll(params: IBaseParams): Promise<ServiceResponse<CompanyPaymentAttributes[]>> {
@@ -60,8 +72,36 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
             });
         }
 
-        await this.companyService.getById({ id: body.uuid_company, includeInactive: true });
-        const created = await this.companyPaymentRepository.create(body);
+        const companyResponse = await this.companyService.getById({ id: body.uuid_company, includeInactive: true });
+        const companyState = companyResponse.data as CompanyAttributes;
+        const renewalAt = companyState.membership_renewal_at ? new Date(companyState.membership_renewal_at) : null;
+        const hasActivePaidSubscription = companyState.membership_status === 'ACTIVE'
+            && !!renewalAt
+            && renewalAt.getTime() >= Date.now();
+        if (hasActivePaidSubscription) {
+            throw new ApiError({
+                name: 'SubscriptionAlreadyActive',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company already has an active paid subscription'
+            });
+        }
+
+        if (!body.payment_method || !PAYMENT_METHODS.includes(body.payment_method)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Valid payment_method is required'
+            });
+        }
+
+        const amount = this.calculateActivationAmount(body.plan_type, body.billing_cycle);
+        const payload: CompanyPaymentCreationAttributes = {
+            ...body,
+            amount,
+            currency: 'BOB'
+        };
+
+        const created = await this.companyPaymentRepository.create(payload);
 
         const company = await CompanyModel.findOne({
             where: {

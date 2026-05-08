@@ -2,7 +2,8 @@ services:
   adg-api-services:
     build: .
     ports:
-      - "3000:3000"
+      - "3010:3010"
+      - "9230:9230"
     environment:
       NODE_ENV: development
       DB_HOST: adg-db-postgres-services
@@ -13,8 +14,8 @@ services:
       JWT_SECRET: local-super-secret-key
       CORS_ORIGIN: http://localhost:4200
       PLATFORM_ONBOARDING_KEY: local-onboarding-key
-      PORT: 3000
-    command: npm run dev
+      PORT: 3010
+    command: npm run dev:debug
     volumes:
       - .:/app
       - /app/node_modules

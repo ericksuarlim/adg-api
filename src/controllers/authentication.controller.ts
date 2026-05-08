@@ -53,6 +53,23 @@ class AuthenticationController {
             next(error);
         }
     }
+
+    me = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            return handleResponse(res, {
+                success: true,
+                data: {
+                    username: req.user?.username,
+                    uuid_company: req.user?.uuid_company,
+                    roles: req.user?.roles,
+                    membership_status: req.user?.membership_status,
+                    membership_renewal_at: req.user?.membership_renewal_at
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default AuthenticationController;

@@ -8,5 +8,6 @@ authenticationRoutes.post('/new-password', container.authenticationController.re
 authenticationRoutes.post('/reset-password', container.authenticationController.resetPassword);
 authenticationRoutes.post('/login', container.authenticationController.login);
 authenticationRoutes.post('/logout', authenticate, container.authenticationController.logout);
+authenticationRoutes.get('/me', authenticate, container.authenticationController.me);
 
 export default authenticationRoutes;

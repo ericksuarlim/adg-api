@@ -6,13 +6,13 @@ import UserController from "../controllers/user.controller";
 import CompanyController from "../controllers/company.controller";
 import RanchRepository from "../repositories/ranch.repository";
 import RanchService from "../services/ranch.service";
-import CattleRepository from "../repositories/cattle.repository";
-import CattleService from "../services/cattle.service";
-import CattleController from "../controllers/cattle.controller";
+import AnimalRepository from "../repositories/animal.repository";
+import AnimalService from "../services/animal.service";
+import AnimalController from "../controllers/animal.controller";
 import RanchController from "../controllers/ranch.controller";
-import CattleWorkSessionRepository from "../repositories/cattle-work-session.repository";
-import CattleWorkSessionService from "../services/cattle-work-session.service";
-import CattleWorkSessionController from "../controllers/cattle-work-session.controller";
+import AnimalWorkSessionRepository from "../repositories/animal-work-session.repository";
+import AnimalWorkSessionService from "../services/animal-work-session.service";
+import AnimalWorkSessionController from "../controllers/animal-work-session.controller";
 import AuthenticationRepository from "../repositories/authentication.repository";
 import AuthenticationController from "../controllers/authentication.controller";
 import AuthenticationService from "../services/authentication.service";
@@ -36,8 +36,8 @@ import CompanyPaymentController from "../controllers/company-payment.controller"
 const companyRepository = new CompanyRepository();
 const userRepository = new UserRepository();
 const ranchRepository = new RanchRepository();
-const cattleRepository = new CattleRepository();
-const cattleWorkSessionRepository = new CattleWorkSessionRepository();
+const animalRepository = new AnimalRepository();
+const animalWorkSessionRepository = new AnimalWorkSessionRepository();
 const sessionRepository = new SessionRepository();
 const authenticationRepository = new AuthenticationRepository();
 const membershipRepository = new MembershipRepository();
@@ -47,11 +47,11 @@ const companyPaymentRepository = new CompanyPaymentRepository();
 
 //Services
 const passwordValidatorService = new PasswordValidatorService();
-const companyService = new CompanyService(companyRepository);
+const companyService = new CompanyService(companyRepository, companyPaymentRepository);
 const userService = new UserService(userRepository, userRepository, companyService, passwordValidatorService);
 const ranchService = new RanchService(ranchRepository);
-const cattleService = new CattleService(cattleRepository);
-const cattleWorkSessionService = new CattleWorkSessionService(cattleWorkSessionRepository);
+const animalService = new AnimalService(animalRepository);
+const animalWorkSessionService = new AnimalWorkSessionService(animalWorkSessionRepository);
 const sessionService = new SessionService(sessionRepository);
 const authenticationService = new AuthenticationService(
     authenticationRepository,
@@ -72,9 +72,9 @@ const companyPaymentService = new CompanyPaymentService(companyPaymentRepository
 //Controllers
 const userController = new UserController(userService, userService);
 const companyController = new CompanyController(companyService, companyOnboardingService);
-const cattleController = new CattleController(cattleService);
+const animalController = new AnimalController(animalService);
 const ranchController = new RanchController(ranchService);
-const cattleWorkSessionController = new CattleWorkSessionController(cattleWorkSessionService);
+const animalWorkSessionController = new AnimalWorkSessionController(animalWorkSessionService);
 const authenticationController = new AuthenticationController(authenticationService);
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
@@ -83,9 +83,9 @@ const companyPaymentController = new CompanyPaymentController(companyPaymentServ
 export const container = {
     userController,
     companyController,
-    cattleController,
+    animalController,
     ranchController,
-    cattleWorkSessionController,
+    animalWorkSessionController,
     authenticationController,
     membershipController,
     referenceSampleController,

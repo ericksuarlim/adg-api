@@ -4,6 +4,7 @@ import {
     CompanyPaymentAttributes,
     CompanyPaymentCreationAttributes
 } from "../../interfaces/company/company-payment.interface";
+import { BILLING_CYCLES, COMPANY_PLAN_TYPES, PaymentMethod, PAYMENT_METHODS, PAYMENT_STATUSES } from "../../constants/domain.constants";
 
 class CompanyPaymentModel extends Model<CompanyPaymentAttributes, CompanyPaymentCreationAttributes>
     implements CompanyPaymentAttributes {
@@ -11,15 +12,15 @@ class CompanyPaymentModel extends Model<CompanyPaymentAttributes, CompanyPayment
     declare uuid_company: string;
     declare amount: number;
     declare currency: string;
-    declare payment_method: string;
+    declare payment_method: PaymentMethod | null;
     declare payment_reference?: string | null;
     declare notes?: string | null;
     declare paid_at: Date;
     declare period_start?: Date | null;
     declare period_end?: Date | null;
-    declare plan_type: 'BASIC' | 'PROFESSIONAL' | 'PREMIUM';
-    declare billing_cycle: 'MONTHLY' | 'ANNUAL';
-    declare status: 'POSTED' | 'VOIDED';
+    declare plan_type: CompanyPaymentAttributes['plan_type'];
+    declare billing_cycle: CompanyPaymentAttributes['billing_cycle'];
+    declare status: CompanyPaymentAttributes['status'];
     declare is_active: boolean;
     declare created_at: Date;
     declare updated_at: Date;
@@ -46,8 +47,8 @@ CompanyPaymentModel.init(
             defaultValue: 'USD',
         },
         payment_method: {
-            type: DataTypes.STRING,
-            allowNull: false,
+            type: DataTypes.ENUM(...PAYMENT_METHODS),
+            allowNull: true,
         },
         payment_reference: {
             type: DataTypes.STRING,
@@ -70,17 +71,17 @@ CompanyPaymentModel.init(
             allowNull: true,
         },
         plan_type: {
-            type: DataTypes.ENUM('BASIC', 'PROFESSIONAL', 'PREMIUM'),
+            type: DataTypes.ENUM(...COMPANY_PLAN_TYPES),
             allowNull: false,
             defaultValue: 'BASIC',
         },
         billing_cycle: {
-            type: DataTypes.ENUM('MONTHLY', 'ANNUAL'),
+            type: DataTypes.ENUM(...BILLING_CYCLES),
             allowNull: false,
             defaultValue: 'MONTHLY',
         },
         status: {
-            type: DataTypes.ENUM('POSTED', 'VOIDED'),
+            type: DataTypes.ENUM(...PAYMENT_STATUSES),
             allowNull: false,
             defaultValue: 'POSTED',
         },

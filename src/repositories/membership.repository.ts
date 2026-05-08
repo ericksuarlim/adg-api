@@ -2,7 +2,7 @@ import { IMembershipRepository } from "../interfaces/repositories/membership-rep
 import { RanchModel, UserRanchModel } from "../database/models";
 import {UserRanchCreationAttributes} from "../interfaces/ranch/user-ranch.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
-import {UserRole} from "../interfaces/roles/roles.interface";
+import {normalizeUserRole, UserRole} from "../interfaces/roles/roles.interface";
 class MembershipRepository implements IMembershipRepository<UserRanchModel, UserRanchCreationAttributes> {
 
     async create(data: UserRanchCreationAttributes): Promise<UserRanchModel> {
@@ -113,7 +113,13 @@ class MembershipRepository implements IMembershipRepository<UserRanchModel, User
             ],
         });
 
-        const uniqueRoles = Array.from(new Set(memberships.map((membership) => membership.role)));
+        const uniqueRoles = Array.from(
+            new Set(
+                memberships
+                    .map((membership) => normalizeUserRole(membership.role))
+                    .filter((role): role is UserRole => role !== null)
+            )
+        );
         return uniqueRoles;
     }
 }

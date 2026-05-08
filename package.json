@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "npx ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:debug": "npx ts-node-dev --respawn --transpile-only --inspect=0.0.0.0:9230 src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"

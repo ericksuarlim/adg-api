@@ -23,14 +23,14 @@ class CompanyPaymentController {
         this.companyPaymentService = companyPaymentService;
     }
 
-    private isSuperAdmin(req: AuthRequest): boolean {
-        return (req.user?.roles ?? []).includes(UserRole.SUPER_ADMIN);
+    private isSaasOwner(req: AuthRequest): boolean {
+        return (req.user?.roles ?? []).includes(UserRole.SAAS_OWNER);
     }
 
     getCompanyPayments = async (req: AuthRequest & Request<ICreateCompanyPaymentParams>, res: Response, next: NextFunction) => {
         try {
             const params: IBaseParams = buildGetAllParams(req.query);
-            const tenantScope = this.isSuperAdmin(req) ? req.params.uuid_company : req.user?.uuid_company;
+            const tenantScope = this.isSaasOwner(req) ? req.params.uuid_company : req.user?.uuid_company;
             params.uuid_company = tenantScope;
             const response = await this.companyPaymentService.getAll(params);
             return handleResponse(res, response);
@@ -46,7 +46,7 @@ class CompanyPaymentController {
     ) => {
         try {
             const { includeInactive } = buildGetByIdParams(req.query);
-            const tenantScope = this.isSuperAdmin(req) ? req.params.uuid_company : req.user?.uuid_company;
+            const tenantScope = this.isSaasOwner(req) ? req.params.uuid_company : req.user?.uuid_company;
             const response = await this.companyPaymentService.getById({
                 id: req.params.uuid_company_payment,
                 includeInactive,
@@ -61,7 +61,7 @@ class CompanyPaymentController {
     createCompanyPayment = async (req: AuthRequest & Request<ICreateCompanyPaymentParams>, res: Response, next: NextFunction) => {
         try {
             const body = req.body as CompanyPaymentCreationAttributes;
-            body.uuid_company = this.isSuperAdmin(req) ? req.params.uuid_company : (req.user?.uuid_company as string);
+            body.uuid_company = this.isSaasOwner(req) ? req.params.uuid_company : (req.user?.uuid_company as string);
             const response = await this.companyPaymentService.create(body);
             return handleResponse(res, response, 201);
         } catch (error) {
@@ -72,7 +72,7 @@ class CompanyPaymentController {
     updateCompanyPayment = async (req: AuthRequest & Request<IUpdateCompanyPaymentParams>, res: Response, next: NextFunction) => {
         try {
             const body = req.body as CompanyPaymentCreationAttributes;
-            const tenantScope = this.isSuperAdmin(req) ? req.params.uuid_company : req.user?.uuid_company;
+            const tenantScope = this.isSaasOwner(req) ? req.params.uuid_company : req.user?.uuid_company;
             body.uuid_company = tenantScope as string;
             const response = await this.companyPaymentService.update(
                 req.params.uuid_company_payment,
@@ -87,7 +87,7 @@ class CompanyPaymentController {
 
     deleteCompanyPayment = async (req: AuthRequest & Request<IDeleteCompanyPaymentParams>, res: Response, next: NextFunction) => {
         try {
-            const tenantScope = this.isSuperAdmin(req) ? req.params.uuid_company : req.user?.uuid_company;
+            const tenantScope = this.isSaasOwner(req) ? req.params.uuid_company : req.user?.uuid_company;
             const response = await this.companyPaymentService.delete(req.params.uuid_company_payment, {
                 uuid_company: tenantScope
             });

@@ -66,6 +66,9 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
+        await this.sessionService.deactivateExpiredSessions(user_name);
+        await this.sessionService.logout(user_name);
+
         const userResponse = await this.userManagerService.getUserByName(user_name);
         const user = userResponse.data;
 
@@ -112,8 +115,6 @@ class AuthenticationService implements IAuthenticationService {
             is_active: true,
             login_date: new Date(),
         };
-
-        await this.sessionService.logout(user_name);
 
         const sessionResponse = await this.sessionService.createSession(session);
 

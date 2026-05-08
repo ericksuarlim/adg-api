@@ -6,7 +6,7 @@ import HttpStatusCodes from "../errors/httpStatusCodes";
 import {UserRanchModel} from "../database/models";
 import {UserRanchAttributes, UserRanchCreationAttributes} from "../interfaces/ranch/user-ranch.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
-import {UserRole} from "../interfaces/roles/roles.interface";
+import {normalizeUserRole, UserRole} from "../interfaces/roles/roles.interface";
 import {isValidRole} from "../utils/globals-utils";
 import {IBaseServiceInterface} from "../interfaces/services/base-service.interface";
 import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
@@ -39,6 +39,15 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
             });
         }
 
+        const normalizedRole = normalizeUserRole(role);
+        if (!normalizedRole) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Role '${role}' is not valid`
+            });
+        }
+
         const existing = await this.membershipRepository.findMembership(uuid_user, uuid_ranch);
 
         if (existing?.is_active) {
@@ -49,7 +58,10 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
             });
         }
 
-        const membership = await this.membershipRepository.create(data);
+        const membership = await this.membershipRepository.create({
+            ...data,
+            role: normalizedRole
+        });
 
         return {
             success: true,
@@ -73,7 +85,16 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
             });
         }
 
-        const updated = await this.membershipRepository.updateRole(uuid_user, uuid_ranch, role);
+        const normalizedRole = normalizeUserRole(role);
+        if (!normalizedRole) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Role '${role}' is not valid`
+            });
+        }
+
+        const updated = await this.membershipRepository.updateRole(uuid_user, uuid_ranch, normalizedRole);
 
         if (!updated) {
             throw new ApiError({

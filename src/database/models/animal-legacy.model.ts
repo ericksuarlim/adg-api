@@ -1,36 +1,36 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database';
-import { CattleAttributes, CattleCreationAttributes } from "../../interfaces/cattle/cattle.interface";
+import { AnimalLegacyAttributes, AnimalLegacyCreationAttributes } from "../../interfaces/animal/animal-legacy.interface";
 
-class Cattle extends Model <CattleAttributes, CattleCreationAttributes> implements CattleAttributes {
-    declare uuid_cattle: number;
-    declare primary_tag_number: string;
-    declare secondary_tag_number: string;
-    declare birthdate: Date;
-    declare sex: string;
-    declare status: boolean;
-    declare color: string;
-    declare detail: string;
-    declare created_at: Date;
-    declare updated_at: Date;
-    declare uuid_breed: number;
-    declare uuid_location: number;
+class AnimalLegacyModel extends Model<AnimalLegacyAttributes, AnimalLegacyCreationAttributes> implements AnimalLegacyAttributes {
+    declare uuid_animal: string;
+    declare primary_tag_number?: string | null;
+    declare secondary_tag_number?: string | null;
+    declare birthdate?: Date | null;
+    declare sex?: string | null;
+    declare status?: boolean | null;
+    declare color?: string | null;
+    declare detail?: string | null;
+    declare created_at?: Date;
+    declare updated_at?: Date;
+    declare uuid_breed?: string | null;
+    declare uuid_location?: string | null;
     declare is_active: boolean;
 }
 
-Cattle.init(
+AnimalLegacyModel.init(
     {
-        uuid_cattle: {
+        uuid_animal: {
             type: DataTypes.UUID,
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
         primary_tag_number: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING,
             allowNull: true,
         },
         secondary_tag_number: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING,
             allowNull: true,
         },
         birthdate: {
@@ -62,11 +62,11 @@ Cattle.init(
             allowNull: true,
         },
         uuid_location: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
             allowNull: true,
         },
         uuid_breed: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.UUID,
             allowNull: true,
         },
         is_active: {
@@ -77,10 +77,11 @@ Cattle.init(
     },
     {
         sequelize,
-        modelName: 'Cattle',
+        tableName: 'Cattle',
+        modelName: 'AnimalLegacy',
         freezeTableName: true,
         timestamps: false,
     }
 );
 
-export default Cattle;
+export default AnimalLegacyModel;

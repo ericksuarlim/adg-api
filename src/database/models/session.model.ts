@@ -23,7 +23,7 @@ SessionModel.init(
             allowNull: false,
         },
         user_token: {
-            type: DataTypes.STRING,
+            type: DataTypes.TEXT,
             allowNull: false,
         },
         is_active: {

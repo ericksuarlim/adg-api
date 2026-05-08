@@ -1,7 +1,8 @@
 import {UserCreationAttributes} from "../interfaces/user/user.interface";
 import {IUserManagerRepository} from "../interfaces/repositories/user-repository.interface";
-import {UserModel} from "../database/models";
+import { CompanyModel, UserModel } from "../database/models";
 import {IBaseRepository} from "../interfaces/repositories/base-repository.interface";
+import { Op } from "sequelize";
 
 class UserRepository implements
     IBaseRepository<UserModel, UserCreationAttributes>,
@@ -50,7 +51,16 @@ class UserRepository implements
             where.uuid_company = uuid_company;
         }
 
-        return await UserModel.findOne({ where });
+        return await UserModel.findOne({
+            where,
+            include: [
+                {
+                    model: CompanyModel,
+                    as: 'company',
+                    attributes: ['uuid_company', 'name']
+                }
+            ]
+        });
     }
 
     async create(data: UserCreationAttributes): Promise<UserModel> {
@@ -101,7 +111,12 @@ class UserRepository implements
     }
 
     async findUserByName(username: string): Promise<UserModel | null>  {
-        const user = await UserModel.findOne({ where: { username, is_active: true } });
+        const user = await UserModel.findOne({
+            where: {
+                [Op.or]: [{ username }, { email: username }],
+                is_active: true
+            }
+        });
 
         return user ?? null;
     }

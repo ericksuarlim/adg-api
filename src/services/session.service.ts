@@ -6,38 +6,52 @@ import {Status} from "../interfaces/params/query.interface";
 import SessionModel from "../database/models/session.model";
 
 class SessionService implements ISessionService<SessionAttributes> {
-    private sessionRepository: ISessionRepository<SessionModel, SessionCreationAttributes>;
+    private readonly sessionRepository: ISessionRepository<SessionModel, SessionCreationAttributes>;
 
     constructor(sessionRepository: ISessionRepository<SessionModel, SessionCreationAttributes>) {
         this.sessionRepository = sessionRepository;
     }
 
     async createSession(data: SessionCreationAttributes): Promise<ServiceResponse<SessionAttributes>> {
-        try {
-            const session = await this.sessionRepository.createSession(data);
-
-            return { success: true, data: session };
-        } catch (error) {
-            return { success: false, error: 'Error creating session' };
-        }
+        const session = await this.sessionRepository.createSession(data);
+        return { success: true, data: session };
     }
 
     async logout(user_name: string): Promise<ServiceResponse<null>> {
-        try {
-            const response = await this.sessionRepository.logout(user_name);
-
-            if (!response) {
-                return {
-                    success: false,
-                    error: 'User not found or logout failed',
-                    code: 404
-                };
-            }
-
-            return { success: true, data: null };
-        } catch (error) {
-            return { success: false, error: 'Error during logout' };
+        const response = await this.sessionRepository.logout(user_name);
+        if (!response) {
+            return {
+                success: false,
+                error: 'User not found or logout failed',
+                code: 404
+            };
         }
+        return { success: true, data: null };
+    }
+
+    async logoutByToken(user_token: string): Promise<ServiceResponse<null>> {
+        const response = await this.sessionRepository.logoutByToken(user_token);
+        if (!response) {
+            return {
+                success: false,
+                error: 'Session token not found',
+                code: 404
+            };
+        }
+        return { success: true, data: null };
+    }
+
+    async hasActiveSession(user_name: string): Promise<boolean> {
+        const session = await this.sessionRepository.findActiveSession(user_name);
+        return Boolean(session);
+    }
+
+    async isTokenSessionActive(user_name: string, user_token: string): Promise<boolean> {
+        return await this.sessionRepository.isTokenSessionActive(user_name, user_token);
+    }
+
+    async deactivateExpiredSessions(user_name?: string): Promise<number> {
+        return await this.sessionRepository.deactivateExpiredSessions(user_name);
     }
 
     async getSessions(params: {
@@ -47,24 +61,20 @@ class SessionService implements ISessionService<SessionAttributes> {
         order: 'ASC' | 'DESC';
         status?: Status;
     }): Promise<ServiceResponse<SessionAttributes[]>> {
-        try {
-            const {rows, count} = await this.sessionRepository.getSessions(params);
-            const plainSessions = rows.map(session => session.get({plain: true}));
+        const {rows, count} = await this.sessionRepository.getSessions(params);
+        const plainSessions = rows.map(session => session.get({plain: true}));
 
-            return {
-                success: true,
-                data: plainSessions,
-                pagination: {
-                    totalItems: count,
-                    totalPages: Math.ceil(count / params.size),
-                    currentPage: params.page,
-                    order: params.order,
-                    pageSize: params.size
-                }
-            };
-        } catch (error) {
-            return { success: false, error: 'Error fetching sessions' };
-        }
+        return {
+            success: true,
+            data: plainSessions,
+            pagination: {
+                totalItems: count,
+                totalPages: Math.ceil(count / params.size),
+                currentPage: params.page,
+                order: params.order,
+                pageSize: params.size
+            }
+        };
     }
 }
 

@@ -1,14 +1,14 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database/index';
 import {
-    CattleWorkSessionAttributes,
-    CattleWorkSessionCreationAttributes
-} from "../../interfaces/work-session/cattle-work-session.interface";
+    AnimalWorkSessionAttributes,
+    AnimalWorkSessionCreationAttributes
+} from "../../interfaces/work-session/animal-work-session.interface";
 
-class CattleWorkSessionModel extends Model<CattleWorkSessionAttributes, CattleWorkSessionCreationAttributes>
-    implements CattleWorkSessionAttributes {
-    declare id_cattle_work: number;
-    declare uuid_cattle: string;
+class AnimalWorkSessionModel extends Model<AnimalWorkSessionAttributes, AnimalWorkSessionCreationAttributes>
+    implements AnimalWorkSessionAttributes {
+    declare id_animal_work: number;
+    declare uuid_animal: string;
     declare work_session_id: string;
     declare attended: boolean;
     declare condition: string;
@@ -18,14 +18,14 @@ class CattleWorkSessionModel extends Model<CattleWorkSessionAttributes, CattleWo
     declare is_active: boolean;
 }
 
-CattleWorkSessionModel.init(
+AnimalWorkSessionModel.init(
     {
-        id_cattle_work: {
+        id_animal_work: {
             type: DataTypes.INTEGER,
             primaryKey: true,
             autoIncrement: true,
         },
-        uuid_cattle: {
+        uuid_animal: {
             type: DataTypes.STRING,
             allowNull: false,
         },
@@ -64,10 +64,11 @@ CattleWorkSessionModel.init(
     },
     {
         sequelize,
-        modelName: 'cattle_work_session',
+        modelName: 'animal_work_session',
         timestamps: false,
         freezeTableName: true,
+        tableName: 'animal_work_session',
     }
 );
 
-export default CattleWorkSessionModel;
+export default AnimalWorkSessionModel;

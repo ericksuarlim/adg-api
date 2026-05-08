@@ -5,8 +5,9 @@ import ApiError from '../errors/apiError';
 import httpStatus from '../errors/httpStatusCodes';
 import { JwtPayload } from "../interfaces/common/jwt-payload.interface";
 import { AUTHORIZATION_SCHEME_BEARER } from "../constants/auth.constants";
-import { CompanyModel } from "../database/models";
-import { UserRole } from "../interfaces/roles/roles.interface";
+import { CompanyModel, SessionModel } from "../database/models";
+import { normalizeUserRoles, UserRole } from "../interfaces/roles/roles.interface";
+import { Op } from "sequelize";
 
 const isJwtPayload = (value: unknown): value is JwtPayload => {
     if (typeof value !== 'object' || value === null) {
@@ -58,9 +59,31 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
             throw new TypeError('Invalid token claims');
         }
 
-        const roles = decoded.roles ?? [];
-        const isSuperAdmin = roles.includes(UserRole.SUPER_ADMIN);
-        if (!isSuperAdmin) {
+        const fifteenHoursAgo = new Date(Date.now() - (15 * 60 * 60 * 1000));
+        const activeSession = await SessionModel.findOne({
+            where: {
+                user_name: decoded.username,
+                user_token: token,
+                is_active: true,
+                login_date: {
+                    [Op.gte]: fifteenHoursAgo
+                }
+            }
+        });
+
+        if (!activeSession) {
+            return next(new ApiError({
+                name: 'SessionExpiredOrInvalid',
+                statusCode: httpStatus.UNAUTHORIZED,
+                description: 'Session expired or invalid. Please login again.',
+                isOperational: true,
+            }));
+        }
+
+        const roles = normalizeUserRoles(decoded.roles ?? []);
+        decoded.roles = roles;
+        const isSaasOwner = roles.includes(UserRole.SAAS_OWNER);
+        if (!isSaasOwner) {
             const company = await CompanyModel.findOne({
                 where: {
                     uuid_company: decoded.uuid_company

@@ -1,6 +1,7 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database';
 import {CompanyAttributes, CompanyCreationAttributes} from "../../interfaces/company/company.interface";
+import { BILLING_CYCLES, COMPANY_PLAN_TYPES, MEMBERSHIP_STATUSES } from '../../constants/domain.constants';
 
 class CompanyModel extends Model <CompanyAttributes, CompanyCreationAttributes>
     implements CompanyAttributes {
@@ -8,9 +9,9 @@ class CompanyModel extends Model <CompanyAttributes, CompanyCreationAttributes>
     declare name: string;
     declare legal_name?: string;
     declare tax_id?: string;
-    declare plan_type: 'BASIC' | 'PROFESSIONAL' | 'PREMIUM';
-    declare billing_cycle: 'MONTHLY' | 'ANNUAL';
-    declare membership_status: 'TRIAL' | 'ACTIVE' | 'PAST_DUE' | 'CANCELLED';
+    declare plan_type: CompanyAttributes['plan_type'];
+    declare billing_cycle: CompanyAttributes['billing_cycle'];
+    declare membership_status: CompanyAttributes['membership_status'];
     declare membership_started_at?: Date | null;
     declare membership_renewal_at?: Date | null;
     declare is_active: boolean;
@@ -39,17 +40,17 @@ CompanyModel.init(
             unique: true,
         },
         plan_type: {
-            type: DataTypes.ENUM('BASIC', 'PROFESSIONAL', 'PREMIUM'),
+            type: DataTypes.ENUM(...COMPANY_PLAN_TYPES),
             allowNull: false,
             defaultValue: 'BASIC',
         },
         billing_cycle: {
-            type: DataTypes.ENUM('MONTHLY', 'ANNUAL'),
+            type: DataTypes.ENUM(...BILLING_CYCLES),
             allowNull: false,
             defaultValue: 'MONTHLY',
         },
         membership_status: {
-            type: DataTypes.ENUM('TRIAL', 'ACTIVE', 'PAST_DUE', 'CANCELLED'),
+            type: DataTypes.ENUM(...MEMBERSHIP_STATUSES),
             allowNull: false,
             defaultValue: 'TRIAL',
         },

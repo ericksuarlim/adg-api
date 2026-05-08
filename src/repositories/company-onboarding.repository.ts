@@ -71,7 +71,7 @@ class CompanyOnboardingRepository implements ICompanyOnboardingRepository<Compan
                 {
                     uuid_user: owner.uuid_user,
                     uuid_ranch: defaultRanch.uuid_ranch,
-                    role: UserRole.SUPER_ADMIN,
+                    role: UserRole.SAAS_OWNER,
                     is_active: true,
                 },
                 { transaction }
@@ -89,7 +89,7 @@ class CompanyOnboardingRepository implements ICompanyOnboardingRepository<Compan
                     uuid_company: owner.uuid_company,
                     username: owner.username,
                     email: owner.email,
-                    role: UserRole.SUPER_ADMIN,
+                    role: UserRole.SAAS_OWNER,
                 },
                 tenant_database: '',
             };
