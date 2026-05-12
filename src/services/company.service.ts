@@ -149,6 +149,106 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         };
     }
 
+    async reactivate(
+        uuid_company: string,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<CompanyAttributes>> {
+        if (!uuid_company || uuid_company.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_company is required'
+            });
+        }
+
+        const reactivated = await this.companyRepository.reactivate(uuid_company, tenantContext);
+
+        if (!reactivated) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Company not found or already active'
+            });
+        }
+
+        const row = await this.companyRepository.findById({
+            id: uuid_company,
+            includeInactive: true,
+            uuid_company: tenantContext?.uuid_company
+        });
+
+        if (!row) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Company not found after reactivate'
+            });
+        }
+
+        return {
+            success: true,
+            data: row.get({ plain: true })
+        };
+    }
+
+    async endSubscription(
+        uuid_company: string,
+        tenantContext?: { uuid_company?: string }
+    ): Promise<ServiceResponse<CompanyAttributes>> {
+        if (!uuid_company || uuid_company.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_company is required'
+            });
+        }
+
+        const currentCompany = await this.companyRepository.findById({
+            id: uuid_company,
+            includeInactive: true,
+            uuid_company: tenantContext?.uuid_company
+        });
+
+        if (!currentCompany) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Company not found'
+            });
+        }
+
+        const plain = currentCompany.get({ plain: true });
+        if (!plain.is_active) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company is archived'
+            });
+        }
+
+        const updated = await this.companyRepository.updateMembershipState(
+            uuid_company,
+            {
+                membership_status: 'CANCELLED',
+                membership_renewal_at: null
+            },
+            tenantContext
+        );
+
+        if (!updated) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Company could not be updated'
+            });
+        }
+
+        return {
+            success: true,
+            data: updated.get({ plain: true })
+        };
+    }
+
     async activateTrial(
         uuid_company: string,
         trialStartDate: string,
@@ -262,7 +362,10 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             name: companyBody.name,
             legal_name: companyBody.legal_name ?? null,
             tax_id: companyBody.tax_id ?? null,
-            is_active: companyBody.is_active ?? true
+            is_active: companyBody.is_active ?? true,
+            membership_status: 'CANCELLED',
+            membership_started_at: null,
+            membership_renewal_at: null
         };
     }
 

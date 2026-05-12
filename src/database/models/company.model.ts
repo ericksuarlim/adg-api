@@ -52,7 +52,7 @@ CompanyModel.init(
         membership_status: {
             type: DataTypes.ENUM(...MEMBERSHIP_STATUSES),
             allowNull: false,
-            defaultValue: 'TRIAL',
+            defaultValue: 'CANCELLED',
         },
         membership_started_at: {
             type: DataTypes.DATE,

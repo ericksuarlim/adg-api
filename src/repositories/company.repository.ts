@@ -80,6 +80,46 @@ class CompanyRepository implements
 
         return count > 0;
     }
+
+    async reactivate(uuid_company: string, options?: { uuid_company?: string }): Promise<CompanyModel | null> {
+        const where: Record<string, unknown> = { uuid_company, is_active: false };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
+        const [count, updated] = await CompanyModel.update(
+            { is_active: true },
+            { where, returning: true }
+        );
+
+        if (count === 0) {
+            return null;
+        }
+
+        return updated?.[0] ?? null;
+    }
+
+    async updateMembershipState(
+        uuid_company: string,
+        data: Partial<CompanyCreationAttributes>,
+        options?: { uuid_company?: string }
+    ): Promise<CompanyModel | null> {
+        const where: Record<string, unknown> = { uuid_company };
+        if (options?.uuid_company) {
+            where.uuid_company = options.uuid_company;
+        }
+
+        const [count, updated] = await CompanyModel.update(data, {
+            where,
+            returning: true
+        });
+
+        if (count === 0) {
+            return null;
+        }
+
+        return updated[0];
+    }
 }
 
 export default CompanyRepository;

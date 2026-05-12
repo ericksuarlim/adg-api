@@ -116,6 +116,30 @@ class CompanyController {
         }
     }
 
+    endCompanySubscription = async (req: AuthRequest & Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
+        try {
+            const { uuid_company } = req.params;
+            const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
+            const response = await this.companyService.endSubscription(uuid_company, { uuid_company: tenantCompany });
+
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    reactivateCompany = async (req: AuthRequest & Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
+        try {
+            const { uuid_company } = req.params;
+            const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
+            const response = await this.companyService.reactivate(uuid_company, { uuid_company: tenantCompany });
+
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     activateTrial = async (
         req: AuthRequest & Request<IUpdateCompanyParams>,
         res: Response,

@@ -11,7 +11,7 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
 import { CompanyModel } from "../database/models";
-import { BillingCycle, PAYMENT_METHODS } from "../constants/domain.constants";
+import { BillingCycle, BILLING_CYCLES, COMPANY_PLAN_TYPES, PAYMENT_METHODS } from "../constants/domain.constants";
 import { ANNUAL_DISCOUNT_PERCENT, PLAN_PRICES_BS } from "../constants/subscription.constants";
 
 class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttributes, CompanyPaymentCreationAttributes> {
@@ -44,6 +44,96 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
             return Number(discountedAnnual.toFixed(2));
         }
         return monthlyPrice;
+    }
+
+    private parseDateField(rawDate: unknown, fieldName: string): Date {
+        const parsed = new Date(String(rawDate));
+        if (Number.isNaN(parsed.getTime())) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `${fieldName} must be a valid date`
+            });
+        }
+        return parsed;
+    }
+
+    private validateAndNormalizeActivationPayment(body: CompanyPaymentCreationAttributes): {
+        amount: number;
+        paidAt: Date;
+        periodStart: Date;
+        paymentReference: string | null;
+        notes: string | null;
+    } {
+        if (!body.plan_type || !COMPANY_PLAN_TYPES.includes(body.plan_type)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Valid plan_type is required'
+            });
+        }
+
+        if (!body.billing_cycle || !BILLING_CYCLES.includes(body.billing_cycle)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Valid billing_cycle is required'
+            });
+        }
+
+        if (!body.payment_method || !PAYMENT_METHODS.includes(body.payment_method)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Valid payment_method is required'
+            });
+        }
+
+        const calculatedAmount = this.calculateActivationAmount(body.plan_type, body.billing_cycle);
+        const amount = body.amount !== undefined && body.amount !== null
+            ? Number(body.amount)
+            : calculatedAmount;
+        if (!Number.isFinite(amount) || amount <= 0) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'amount must be a positive number'
+            });
+        }
+
+        if (body.paid_at === undefined || body.paid_at === null || String(body.paid_at).trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'paid_at is required'
+            });
+        }
+
+        if (body.period_start === undefined || body.period_start === null || String(body.period_start).trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'period_start (activation start date) is required'
+            });
+        }
+
+        const paidAt = this.parseDateField(body.paid_at, 'paid_at');
+        const periodStart = this.parseDateField(body.period_start, 'period_start');
+
+        const paymentReference = body.payment_reference !== undefined && body.payment_reference !== null
+            ? String(body.payment_reference).trim()
+            : '';
+        const notes = body.notes !== undefined && body.notes !== null
+            ? String(body.notes).trim()
+            : '';
+
+        return {
+            amount,
+            paidAt,
+            periodStart,
+            paymentReference: paymentReference.length > 0 ? paymentReference : null,
+            notes: notes.length > 0 ? notes : null
+        };
     }
 
     async getAll(params: IBaseParams): Promise<ServiceResponse<CompanyPaymentAttributes[]>> {
@@ -86,19 +176,16 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
             });
         }
 
-        if (!body.payment_method || !PAYMENT_METHODS.includes(body.payment_method)) {
-            throw new ApiError({
-                name: 'ValidationError',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'Valid payment_method is required'
-            });
-        }
+        const normalized = this.validateAndNormalizeActivationPayment(body);
 
-        const amount = this.calculateActivationAmount(body.plan_type, body.billing_cycle);
         const payload: CompanyPaymentCreationAttributes = {
             ...body,
-            amount,
-            currency: 'BOB'
+            amount: normalized.amount,
+            currency: 'BOB',
+            paid_at: normalized.paidAt,
+            period_start: normalized.periodStart,
+            payment_reference: normalized.paymentReference,
+            notes: normalized.notes
         };
 
         const created = await this.companyPaymentRepository.create(payload);
@@ -109,18 +196,20 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
             }
         });
         if (company) {
-            const paidAt = new Date(body.paid_at);
             const currentRenewal = company.membership_renewal_at ? new Date(company.membership_renewal_at) : null;
-            const baseDate = currentRenewal && currentRenewal > paidAt ? currentRenewal : paidAt;
+            const baseDate = currentRenewal && currentRenewal > normalized.periodStart ? currentRenewal : normalized.periodStart;
             const nextRenewal = this.calculateNextRenewalDate(baseDate, body.billing_cycle);
 
             company.plan_type = body.plan_type;
             company.billing_cycle = body.billing_cycle;
             company.membership_status = 'ACTIVE';
             company.is_active = true;
-            company.membership_started_at = company.membership_started_at ?? paidAt;
+            company.membership_started_at = normalized.periodStart;
             company.membership_renewal_at = nextRenewal;
             await company.save();
+
+            created.period_end = nextRenewal;
+            await created.save();
         }
 
         return {
