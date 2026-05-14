@@ -7,22 +7,28 @@ import authenticationRoutes from "./authentication.routes";
 import ranchRoutes from "./ranch.routes";
 import membershipRoutes from "./membership.routes";
 import { authenticate } from "../middlewares/auth.middleware";
-import publicRoutes from "./public.routes";
+import { resolveTenantOperationalContext } from "../middlewares/tenant-context.middleware";
 import ownerRoutes from "./owner.routes";
 import referenceSampleRoutes from "./reference-sample.routes";
 
 const router = Router();
 
-router.use('/animal-work-session', animalWorkSessionRoutes);
 router.use('/session', authenticationRoutes);
-router.use('/public', publicRoutes);
 router.use(authenticate);
+
+/** SaaS-only routes: must not run `resolveTenantOperationalContext` (no tenant DB for list endpoints). */
 router.use('/reference-sample', referenceSampleRoutes);
-router.use('/animal', animalRoutes);
-router.use('/owner', ownerRoutes);
 router.use('/user', userRoutes);
 router.use('/company', companyRoutes);
-router.use('/ranch', ranchRoutes);
-router.use('/membership', membershipRoutes);
+
+const operationalRouter = Router({ mergeParams: true });
+operationalRouter.use(resolveTenantOperationalContext);
+operationalRouter.use('/ranch', ranchRoutes);
+operationalRouter.use('/animal', animalRoutes);
+operationalRouter.use('/owner', ownerRoutes);
+operationalRouter.use('/animal-work-session', animalWorkSessionRoutes);
+operationalRouter.use('/membership', membershipRoutes);
+
+router.use(operationalRouter);
 
 export default router;

@@ -6,6 +6,10 @@ export interface CompanyAttributes {
     name: string;
     legal_name?: string | null;
     tax_id?: string | null;
+    /** PostgreSQL database name for this company operational data (ranch, animals, etc.). */
+    tenant_database?: string | null;
+    /** Schema revision applied to the tenant database; see TENANT_SCHEMA_VERSION. */
+    tenant_schema_version?: number | null;
     plan_type: CompanyPlanType;
     billing_cycle: BillingCycle;
     membership_status: MembershipStatus;
@@ -19,6 +23,8 @@ export interface CompanyAttributes {
 export type CompanyCreationAttributes = Optional<
     CompanyAttributes,
     | 'uuid_company'
+    | 'tenant_database'
+    | 'tenant_schema_version'
     | 'plan_type'
     | 'billing_cycle'
     | 'membership_status'

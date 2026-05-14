@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const animalWorkSessionRoutes = (0, express_1.Router)({ mergeParams: true });
+animalWorkSessionRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.animalWorkSessionController.getAnimalWorkSessions);
+animalWorkSessionRoutes.get('/:id_animal_work', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.animalWorkSessionController.getAnimalWorkSession);
+animalWorkSessionRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.animalWorkSessionController.createAnimalWorkSession);
+animalWorkSessionRoutes.put('/:id_animal_work', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.animalWorkSessionController.updateAnimalWorkSession);
+animalWorkSessionRoutes.delete('/:id_animal_work', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.animalWorkSessionController.deleteAnimalWorkSession);
+exports.default = animalWorkSessionRoutes;

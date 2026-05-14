@@ -3,6 +3,7 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { ITenantProvisioningService } from "../interfaces/services/tenant-provisioning-service.interface";
 import { TENANT_DB_NAME_PREFIX, TENANT_DB_SAFE_NAME_REGEX } from "../constants/tenant.constants";
+import { getTenantPoolEntry } from "../database/tenant/tenant-sequelize-lru";
 
 class TenantProvisioningService implements ITenantProvisioningService {
     async provisionDatabase(companyUuid: string): Promise<string> {
@@ -11,8 +12,12 @@ class TenantProvisioningService implements ITenantProvisioningService {
         return tenantDbName;
     }
 
+    async bootstrapOperationalTenant(tenantDatabaseName: string): Promise<void> {
+        await getTenantPoolEntry(tenantDatabaseName);
+    }
+
     private buildTenantDatabaseName(companyUuid: string): string {
-        const normalizedUuid = companyUuid.replaceAll('-', '_').toLowerCase();
+        const normalizedUuid = companyUuid.replace(/-/g, '_').toLowerCase();
         return `${TENANT_DB_NAME_PREFIX}_${normalizedUuid}`;
     }
 

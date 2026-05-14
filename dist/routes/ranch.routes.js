@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const ranchRoutes = (0, express_1.Router)();
+ranchRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_WRITE), container_1.container.ranchController.createRanch);
+ranchRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_READ), container_1.container.ranchController.getRanches);
+ranchRoutes.get('/:uuid_ranch/paddocks', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_READ), container_1.container.ranchController.getRanchPaddocks);
+ranchRoutes.get('/:uuid_ranch', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_READ), container_1.container.ranchController.getRanch);
+ranchRoutes.put('/:uuid_ranch', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_WRITE), container_1.container.ranchController.updateRanch);
+ranchRoutes.delete('/:uuid_ranch', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.RANCH_WRITE), container_1.container.ranchController.deleteRanch);
+exports.default = ranchRoutes;

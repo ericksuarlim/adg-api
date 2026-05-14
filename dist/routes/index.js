@@ -1,0 +1,33 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const user_routes_1 = __importDefault(require("./user.routes"));
+const company_routes_1 = __importDefault(require("./company.routes"));
+const animal_routes_1 = __importDefault(require("./animal.routes"));
+const animal_work_session_routes_1 = __importDefault(require("./animal-work-session.routes"));
+const authentication_routes_1 = __importDefault(require("./authentication.routes"));
+const ranch_routes_1 = __importDefault(require("./ranch.routes"));
+const membership_routes_1 = __importDefault(require("./membership.routes"));
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const tenant_context_middleware_1 = require("../middlewares/tenant-context.middleware");
+const owner_routes_1 = __importDefault(require("./owner.routes"));
+const reference_sample_routes_1 = __importDefault(require("./reference-sample.routes"));
+const router = (0, express_1.Router)();
+router.use('/session', authentication_routes_1.default);
+router.use(auth_middleware_1.authenticate);
+/** SaaS-only routes: must not run `resolveTenantOperationalContext` (no tenant DB for list endpoints). */
+router.use('/reference-sample', reference_sample_routes_1.default);
+router.use('/user', user_routes_1.default);
+router.use('/company', company_routes_1.default);
+const operationalRouter = (0, express_1.Router)({ mergeParams: true });
+operationalRouter.use(tenant_context_middleware_1.resolveTenantOperationalContext);
+operationalRouter.use('/ranch', ranch_routes_1.default);
+operationalRouter.use('/animal', animal_routes_1.default);
+operationalRouter.use('/owner', owner_routes_1.default);
+operationalRouter.use('/animal-work-session', animal_work_session_routes_1.default);
+operationalRouter.use('/membership', membership_routes_1.default);
+router.use(operationalRouter);
+exports.default = router;

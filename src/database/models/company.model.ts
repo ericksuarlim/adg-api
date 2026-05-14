@@ -14,6 +14,8 @@ class CompanyModel extends Model <CompanyAttributes, CompanyCreationAttributes>
     declare membership_status: CompanyAttributes['membership_status'];
     declare membership_started_at?: Date | null;
     declare membership_renewal_at?: Date | null;
+    declare tenant_database?: string | null;
+    declare tenant_schema_version?: number | null;
     declare is_active: boolean;
     declare created_at: Date;
     declare updated_at: Date;
@@ -60,6 +62,14 @@ CompanyModel.init(
         },
         membership_renewal_at: {
             type: DataTypes.DATE,
+            allowNull: true,
+        },
+        tenant_database: {
+            type: DataTypes.STRING(128),
+            allowNull: true,
+        },
+        tenant_schema_version: {
+            type: DataTypes.INTEGER,
             allowNull: true,
         },
         is_active: {

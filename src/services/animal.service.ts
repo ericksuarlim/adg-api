@@ -5,19 +5,22 @@ import { IBaseServiceInterface } from "../interfaces/services/base-service.inter
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { IBaseParams } from "../interfaces/params/query.interface";
-import RanchModel from "../database/models/ranch.model";
-import AnimalModel from "../database/models/animal.model";
 import AnimalRepository from "../repositories/animal.repository";
 import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
 import { normalizeCompanyPlanType, PLAN_HEAD_LIMIT } from "../constants/subscription.constants";
 import { isValidCattleBreedCode } from "../constants/cattle-breed.constants";
 import PaddockRepository from "../repositories/paddock.repository";
 import OwnerRepository from "../repositories/owner.repository";
+import { RanchAttributes, RanchCreationAttributes } from "../interfaces/ranch/ranch.interface";
+import { requireTenantModels } from "../database/tenant/tenant-request-context";
+import type { Model } from "sequelize";
 
 export type AnimalCreateContext = {
     jwtCompanyUuid?: string;
     isSaasOwner: boolean;
 };
+
+type RanchRow = Model<RanchAttributes, RanchCreationAttributes>;
 
 class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes> {
 
@@ -46,9 +49,10 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             return;
         }
 
+        const { RanchModel } = requireTenantModels();
         const ranch = await RanchModel.findOne({
             where: { uuid_ranch: uuidRanch, is_active: true }
-        });
+        }) as RanchRow | null;
         if (!ranch) {
             throw new ApiError({
                 name: 'ValidationError',
@@ -57,8 +61,10 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
+        const ranchPlain = ranch.get({ plain: true }) as RanchAttributes;
+
         const tenantCompany = tenantContext?.uuid_company;
-        if (tenantCompany && ranch.uuid_company !== tenantCompany) {
+        if (tenantCompany && ranchPlain.uuid_company !== tenantCompany) {
             throw new ApiError({
                 name: 'Forbidden',
                 statusCode: HttpStatusCodes.FORBIDDEN,
@@ -71,9 +77,10 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         ranchUuid: string,
         ctx: AnimalCreateContext
     ): Promise<string> {
+        const { RanchModel } = requireTenantModels();
         const ranch = await RanchModel.findOne({
             where: { uuid_ranch: ranchUuid, is_active: true }
-        });
+        }) as RanchRow | null;
         if (!ranch) {
             throw new ApiError({
                 name: 'ValidationError',
@@ -82,7 +89,8 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
         if (!ctx.isSaasOwner) {
-            if (ranch.uuid_company !== ctx.jwtCompanyUuid) {
+            const ranchPlain = ranch.get({ plain: true }) as RanchAttributes;
+            if (ranchPlain.uuid_company !== ctx.jwtCompanyUuid) {
                 throw new ApiError({
                     name: 'Forbidden',
                     statusCode: HttpStatusCodes.FORBIDDEN,
@@ -90,7 +98,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
                 });
             }
         }
-        return ranch.uuid_company as string;
+        return (ranch.get({ plain: true }) as RanchAttributes).uuid_company as string;
     }
 
     private async resolveParentUuidByRegistration(
@@ -202,7 +210,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
 
     async getAll(params: IBaseParams): Promise<ServiceResponse<AnimalAttributes[]>> {
         const { rows, count } = await this.animalRepository.findAll(params);
-        const plainAnimals = rows.map((animal: AnimalModel) => animal.get({ plain: true }));
+        const plainAnimals = rows.map((animal: Model<AnimalAttributes, AnimalCreationAttributes>) => animal.get({ plain: true }));
         return {
             success: true,
             data: plainAnimals,
@@ -404,15 +412,17 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        const ranchUuid = current.ranch_uuid;
+        const currentAttrs = current.get({ plain: true }) as AnimalAttributes;
+
+        const ranchUuid = currentAttrs.ranch_uuid;
 
         const effectiveTenant = {
             uuid_company: tenantContext?.uuid_company,
             uuid_ranch_in: tenantContext?.uuid_ranch_in,
         };
 
-        await this.validateRanchBelongsToCompany(current.ranch_uuid, effectiveTenant);
-        const nextRanch = body.ranch_uuid ?? current.ranch_uuid;
+        await this.validateRanchBelongsToCompany(currentAttrs.ranch_uuid, effectiveTenant);
+        const nextRanch = body.ranch_uuid ?? currentAttrs.ranch_uuid;
         await this.validateRanchBelongsToCompany(nextRanch, effectiveTenant);
 
         if (body.breed_code !== undefined && body.breed_code !== null) {
@@ -442,8 +452,8 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             }
         }
 
-        let mother_animal_uuid = body.mother_animal_uuid !== undefined ? body.mother_animal_uuid : current.mother_animal_uuid;
-        let father_animal_uuid = body.father_animal_uuid !== undefined ? body.father_animal_uuid : current.father_animal_uuid;
+        let mother_animal_uuid = body.mother_animal_uuid !== undefined ? body.mother_animal_uuid : currentAttrs.mother_animal_uuid;
+        let father_animal_uuid = body.father_animal_uuid !== undefined ? body.father_animal_uuid : currentAttrs.father_animal_uuid;
 
         if (body.mother_registration_number?.trim()) {
             mother_animal_uuid = await this.resolveParentUuidByRegistration(

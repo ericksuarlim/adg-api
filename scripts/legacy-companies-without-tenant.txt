@@ -1,0 +1,14 @@
+Legacy companies without tenant_database
+=======================================
+
+Symptoms: HTTP 503 from operational routes with message about missing tenant database.
+
+Checklist per company (uuid_company):
+1. Ensure user_ranches.uuid_company is populated (see scripts/backfill-user-ranches-uuid-company.sql).
+2. CREATE DATABASE tenant_<uuid_with_underscores> matching TENANT_DB_NAME_PREFIX + normalized company UUID.
+3. Start API so SaaS sync adds ranch_company_route and new SaaS columns, or run equivalent DDL.
+4. Point the API at SaaS DB (DB_NAME) and set companies.tenant_database to that database name.
+5. Call tenant bootstrap: first authenticated request to /ranch under `resolveTenantOperationalContext` runs Sequelize sync on the tenant DB; or trigger by any such route.
+6. Migrate operational data from an old monolith DB into the tenant DB (manual ETL / pg_dump scoped to tenant tables) — not automated in this repo.
+
+For greenfield, create the company as `saas_owner` from the UI (SaaS company list → Create company): `POST /company` provisions tenant DB and schema only. Create ranches with `POST /ranch`, then users with `POST /user` (SaaS may create administrators or staff; tenant administrators only staff).

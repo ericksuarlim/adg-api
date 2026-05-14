@@ -1,9 +1,13 @@
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
-import { RanchModel } from "../database/models";
 import { RanchCreationAttributes } from "../interfaces/ranch/ranch.interface";
 import { Op } from "sequelize";
+import type { Model } from "sequelize";
+import type { RanchAttributes } from "../interfaces/ranch/ranch.interface";
+import { requireTenantModels } from "../database/tenant/tenant-request-context";
 
-class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttributes> {
+type RanchRow = Model<RanchAttributes, RanchCreationAttributes>;
+
+class RanchRepository implements IBaseRepository<RanchRow, RanchCreationAttributes> {
 
     async findAll(params: {
         page: number;
@@ -13,14 +17,15 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         status?: 'all' | 'active' | 'inactive';
         uuid_company?: string;
         uuid_ranch_in?: string[];
-    }): Promise<{rows: RanchModel[], count: number}> {
+    }): Promise<{rows: RanchRow[], count: number}> {
 
+        const { RanchModel } = requireTenantModels();
         const { page, size, sortBy, order, status } = params;
 
         const offset = (page - 1) * size;
         const limit = size;
 
-        const where: any = {};
+        const where: Record<string, unknown> = {};
 
         if (status === 'active') {
             where.is_active = true;
@@ -47,14 +52,15 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         includeInactive?: boolean;
         uuid_company?: string;
         uuid_ranch_in?: string[];
-    }): Promise<RanchModel | null> {
+    }): Promise<RanchRow | null> {
+        const { RanchModel } = requireTenantModels();
         const { id: uuid_ranch, includeInactive, uuid_company, uuid_ranch_in } = params;
 
         if (uuid_ranch_in?.length && !uuid_ranch_in.includes(uuid_ranch)) {
             return null;
         }
 
-        const where: any = { uuid_ranch };
+        const where: Record<string, unknown> = { uuid_ranch };
 
         if (!includeInactive) {
             where.is_active = true;
@@ -66,12 +72,14 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         return await RanchModel.findOne({ where });
     }
 
-    async create(data: RanchCreationAttributes): Promise<RanchModel> {
+    async create(data: RanchCreationAttributes): Promise<RanchRow> {
+        const { RanchModel } = requireTenantModels();
         return await RanchModel.create(data);
     }
 
-    async update(uuid_ranch: string, data: RanchCreationAttributes, options?: { uuid_company?: string }): Promise<RanchModel | null> {
-        const where: any = { uuid_ranch, is_active: true };
+    async update(uuid_ranch: string, data: RanchCreationAttributes, options?: { uuid_company?: string }): Promise<RanchRow | null> {
+        const { RanchModel } = requireTenantModels();
+        const where: Record<string, unknown> = { uuid_ranch, is_active: true };
         if (options?.uuid_company) {
             where.uuid_company = options.uuid_company;
         }
@@ -87,7 +95,8 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
     }
 
     async delete(uuid_ranch: string, options?: { uuid_company?: string }): Promise<boolean> {
-        const where: any = { uuid_ranch, is_active: true };
+        const { RanchModel } = requireTenantModels();
+        const where: Record<string, unknown> = { uuid_ranch, is_active: true };
         if (options?.uuid_company) {
             where.uuid_company = options.uuid_company;
         }

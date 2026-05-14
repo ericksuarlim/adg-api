@@ -12,10 +12,9 @@ import {CompanyAttributes, CompanyCreationAttributes} from "../interfaces/compan
 import {IPasswordValidatorService} from "../interfaces/services/password-validator-service.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
 import {UserFieldAvailabilityResult} from "../interfaces/user/user-availability.interface";
+import { isValidAssignableRole, normalizeUserRole, UserRole } from "../interfaces/roles/roles.interface";
 
-class UserService implements
-    IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
-    IUserManagerServiceInterface<UserAttributes> {
+class UserService implements IUserManagerServiceInterface<UserAttributes> {
 
     private readonly userRepository: IBaseRepository<UserModel, UserCreationAttributes>;
     private readonly userManagerRepository: IUserManagerRepository<UserModel>;
@@ -32,6 +31,111 @@ class UserService implements
         this.userManagerRepository = userManagerRepository;
         this.companyService = companyService;
         this.passwordValidatorService = passwordValidatorService;
+    }
+
+    private pickRoleForCreate(userBody: UserCreationAttributes): UserRole {
+        const raw = userBody.role != null ? String(userBody.role) : UserRole.RANCH_STAFF;
+        const resolved = normalizeUserRole(raw) ?? UserRole.RANCH_STAFF;
+        if (resolved === UserRole.SAAS_OWNER) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Invalid role',
+            });
+        }
+        if (!isValidAssignableRole(resolved)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Invalid role',
+            });
+        }
+        return resolved;
+    }
+
+    private assertCreateUserRolePolicy(callerRoles: UserRole[], assignedRole: UserRole): void {
+        if (callerRoles.includes(UserRole.SAAS_OWNER)) {
+            return;
+        }
+        if (callerRoles.includes(UserRole.ADMINISTRATOR)) {
+            if (assignedRole !== UserRole.RANCH_STAFF) {
+                throw new ApiError({
+                    name: 'Forbidden',
+                    statusCode: HttpStatusCodes.FORBIDDEN,
+                    description: 'Tenant administrators may only create ranch_staff users',
+                });
+            }
+            return;
+        }
+        throw new ApiError({
+            name: 'Forbidden',
+            statusCode: HttpStatusCodes.FORBIDDEN,
+            description: 'Insufficient permissions to create users',
+        });
+    }
+
+    private assertUpdateUserRolePolicy(
+        callerRoles: UserRole[] | undefined,
+        existingRole: UserRole,
+        nextRole: UserRole,
+        skipPolicy?: boolean
+    ): void {
+        if (skipPolicy) {
+            return;
+        }
+        if (!callerRoles?.length) {
+            throw new ApiError({
+                name: 'InternalError',
+                statusCode: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+                description: 'User update requires caller roles for role policy',
+            });
+        }
+        if (callerRoles.includes(UserRole.SAAS_OWNER)) {
+            return;
+        }
+        if (callerRoles.includes(UserRole.ADMINISTRATOR)) {
+            if (nextRole === UserRole.ADMINISTRATOR && existingRole !== UserRole.ADMINISTRATOR) {
+                throw new ApiError({
+                    name: 'Forbidden',
+                    statusCode: HttpStatusCodes.FORBIDDEN,
+                    description: 'Tenant administrators cannot grant the company administrator role',
+                });
+            }
+            return;
+        }
+        throw new ApiError({
+            name: 'Forbidden',
+            statusCode: HttpStatusCodes.FORBIDDEN,
+            description: 'Insufficient permissions to change user roles',
+        });
+    }
+
+    private userRepoUpdateScope(
+        tenantContext?: { uuid_company?: string; creatorRoles?: UserRole[]; skipRoleAssignmentPolicy?: boolean }
+    ): { uuid_company?: string } | undefined {
+        if (tenantContext?.uuid_company === undefined || tenantContext.uuid_company === null) {
+            return undefined;
+        }
+        const uuid_company = String(tenantContext.uuid_company).trim();
+        if (uuid_company === '') {
+            return undefined;
+        }
+        return { uuid_company };
+    }
+
+    private normalizeRoleForUpdate(role: unknown, existing: UserRole): UserRole {
+        if (role === undefined || role === null || String(role).trim() === '') {
+            return existing;
+        }
+        const resolved = normalizeUserRole(String(role));
+        if (!resolved || resolved === UserRole.SAAS_OWNER || !isValidAssignableRole(resolved)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Invalid role',
+            });
+        }
+        return resolved;
     }
 
     private getMaxUsersByPlan(planType: CompanyAttributes['plan_type']): number {
@@ -64,7 +168,7 @@ class UserService implements
         };
     }
 
-    async create(userBody: UserCreationAttributes): Promise<ServiceResponse<UserAttributes>> {
+    async create(userBody: UserCreationAttributes, callerRolesArg?: unknown): Promise<ServiceResponse<UserAttributes>> {
         if (!userBody.password) {
             throw new ApiError({
                 name: 'ValidationError',
@@ -73,9 +177,18 @@ class UserService implements
             });
         }
 
+        const callerRoles = Array.isArray(callerRolesArg) ? (callerRolesArg as UserRole[]) : [];
+        if (!callerRoles.length) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Caller roles are required',
+            });
+        }
+
         const companyResponse = await this.companyService.getById({ id: userBody.uuid_company });
 
-        if (!companyResponse.success) {
+        if (!companyResponse.success || !companyResponse.data) {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
@@ -110,10 +223,13 @@ class UserService implements
             });
 
         const hashedPassword = await bcrypt.hash(userBody.password, 10);
+        const role = this.pickRoleForCreate(userBody);
+        this.assertCreateUserRolePolicy(callerRoles, role);
 
         const user = await this.userRepository.create({
             ...userBody,
-            password: hashedPassword
+            password: hashedPassword,
+            role,
         });
 
         return {
@@ -152,7 +268,7 @@ class UserService implements
     async update(
         uuid_user: string,
         userBody: UserCreationAttributes,
-        tenantContext?: { uuid_company?: string }
+        tenantContext?: { uuid_company?: string; creatorRoles?: UserRole[]; skipRoleAssignmentPolicy?: boolean }
     ): Promise<ServiceResponse<UserAttributes>> {
         if (!uuid_user || uuid_user.trim() === '') {
             throw new ApiError({
@@ -187,17 +303,27 @@ class UserService implements
         await this.assertUniqueUserFields(merged, uuid_user);
 
         const updateData: UserCreationAttributes = { ...userBody };
+        const nextRole = this.normalizeRoleForUpdate(userBody.role, existing.role);
+        updateData.role = nextRole;
         if (updateData.password !== undefined && updateData.password !== null) {
             const rawPassword = String(updateData.password).trim();
             if (rawPassword === '') {
-                delete updateData.password;
+                (updateData as Partial<UserCreationAttributes>).password = undefined;
             } else {
                 this.passwordValidatorService.validate(rawPassword);
                 updateData.password = await bcrypt.hash(rawPassword, 10);
             }
         }
 
-        const updatedUser = await this.userRepository.update(uuid_user, updateData, tenantContext);
+        const existingRole = normalizeUserRole(String(existing.role)) ?? UserRole.RANCH_STAFF;
+        this.assertUpdateUserRolePolicy(
+            tenantContext?.creatorRoles,
+            existingRole,
+            nextRole,
+            tenantContext?.skipRoleAssignmentPolicy === true
+        );
+
+        const updatedUser = await this.userRepository.update(uuid_user, updateData, this.userRepoUpdateScope(tenantContext));
 
         if (!updatedUser) {
             throw new ApiError({

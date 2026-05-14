@@ -1,34 +1,31 @@
-import { IMembershipService, MembershipTenantOptions } from "../interfaces/services/membership-service.interface";
-import { IMembershipRepository } from "../interfaces/repositories/membership-repository.interface";
+import {
+    CompanyMembershipAssignBody,
+    IMembershipService,
+    MembershipTenantOptions,
+} from "../interfaces/services/membership-service.interface";
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
-import {UserRanchModel} from "../database/models";
-import {UserRanchAttributes, UserRanchCreationAttributes} from "../interfaces/ranch/user-ranch.interface";
-import {IBaseParams} from "../interfaces/params/query.interface";
-import {normalizeUserRole, UserRole, isValidAssignableRole} from "../interfaces/roles/roles.interface";
-import {IBaseServiceInterface} from "../interfaces/services/base-service.interface";
-import {UserAttributes, UserCreationAttributes} from "../interfaces/user/user.interface";
-import {RanchAttributes, RanchCreationAttributes} from "../interfaces/ranch/ranch.interface";
+import { UserRanchAttributes } from "../interfaces/ranch/user-ranch.interface";
+import { IBaseParams } from "../interfaces/params/query.interface";
+import { normalizeUserRole, UserRole, isValidAssignableRole } from "../interfaces/roles/roles.interface";
+import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
+import { UserAttributes, UserCreationAttributes } from "../interfaces/user/user.interface";
+import { RanchAttributes, RanchCreationAttributes } from "../interfaces/ranch/ranch.interface";
+import UserService from "./user.services";
 
 /**
- * Membresías usuario ↔ rancho (`user_ranches`):
- * - Compañía: N ranchos, N usuarios.
- * - Administrador: puede tener varias membresías activas (N ranchos de esa compañía).
- * - `ranch_staff`: puede tener varias membresías en la misma compañía; el alcance operativo es por compañía
- *   (las restricciones son por permisos / rol, no por “un solo rancho”).
+ * Company-scoped membership: roles live on `users.role`. Staff and administrators
+ * operate on any ranch in the company; endpoints that still carry `uuid_ranch` echo it for clients.
  */
-class MembershipService implements IMembershipService<UserRanchAttributes, UserRanchCreationAttributes> {
-    private readonly membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>;
-    private readonly userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
+class MembershipService implements IMembershipService {
+    private readonly userService: UserService;
     private readonly ranchService: IBaseServiceInterface<RanchAttributes, RanchCreationAttributes>;
 
     constructor(
-        membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>,
-        userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
+        userService: UserService,
         ranchService: IBaseServiceInterface<RanchAttributes, RanchCreationAttributes>
     ) {
-        this.membershipRepository = membershipRepository;
         this.userService = userService;
         this.ranchService = ranchService;
     }
@@ -44,14 +41,14 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
     ): Promise<string> {
         const userResponse = await this.userService.getById({
             id: uuid_user,
-            includeInactive: false
+            includeInactive: false,
         });
 
         if (!userResponse.success || !userResponse.data) {
             throw new ApiError({
-                name: 'NotFound',
+                name: "NotFound",
                 statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'User not found'
+                description: "User not found",
             });
         }
 
@@ -59,9 +56,9 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
 
         if (!this.isCrossTenantRequest(options) && tenantCompany !== jwtCompany) {
             throw new ApiError({
-                name: 'Forbidden',
+                name: "Forbidden",
                 statusCode: HttpStatusCodes.FORBIDDEN,
-                description: 'Cannot manage users outside your company'
+                description: "Cannot manage users outside your company",
             });
         }
 
@@ -81,9 +78,9 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
 
         if (!ranchResponse.success || !ranchResponse.data) {
             throw new ApiError({
-                name: 'NotFound',
+                name: "NotFound",
                 statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'Ranch not found'
+                description: "Ranch not found",
             });
         }
 
@@ -91,131 +88,205 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
 
         if (!this.isCrossTenantRequest(options) && tenantCompany !== jwtCompany) {
             throw new ApiError({
-                name: 'Forbidden',
+                name: "Forbidden",
                 statusCode: HttpStatusCodes.FORBIDDEN,
-                description: 'Cannot manage ranches outside your company'
+                description: "Cannot manage ranches outside your company",
             });
         }
 
         return tenantCompany;
     }
 
-    async assignUserToRanch(
-        data: UserRanchCreationAttributes,
-        jwtCompany: string,
-        options?: MembershipTenantOptions
-    ): Promise<ServiceResponse<UserRanchAttributes>> {
-        const { uuid_user, uuid_ranch, role } = data;
-        const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        await this.validateUserAndRanch(uuid_user, uuid_ranch, tenantCompany);
-
-        const normalizedRole = normalizeUserRole(String(role));
-        if (!normalizedRole || !isValidAssignableRole(normalizedRole)) {
+    private assertAssignableRole(role: UserRole): void {
+        if (role === UserRole.SAAS_OWNER) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: `Role '${role}' is not valid`
+                description: "saas_owner cannot be assigned via membership API",
             });
         }
-
-        const existing = await this.membershipRepository.findMembership(uuid_user, uuid_ranch);
-
-        if (existing?.is_active) {
+        if (!isValidAssignableRole(role)) {
             throw new ApiError({
-                name: 'Conflict',
-                statusCode: HttpStatusCodes.CONFLICT,
-                description: 'User already assigned to this ranch'
+                name: "ValidationError",
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Role '${role}' is not valid`,
             });
         }
+    }
 
-        const membership =
-            existing && !existing.is_active
-                ? await this.membershipRepository.upsertActiveMembership(uuid_user, uuid_ranch, normalizedRole)
-                : await this.membershipRepository.create({
-                      ...data,
-                      role: normalizedRole,
-                      is_active: true,
-                  });
-
-        if (normalizedRole === UserRole.ADMINISTRATOR) {
-            await this.syncAdministratorMembershipsAcrossCompany(uuid_user, tenantCompany);
-        }
-
+    private toMembershipRow(
+        uuid_ranch: string,
+        uuid_company: string,
+        user: UserAttributes
+    ): UserRanchAttributes {
+        const role = normalizeUserRole(String(user.role)) ?? UserRole.RANCH_STAFF;
         return {
-            success: true,
-            data: membership.get({ plain: true })
+            user_ranch_id: 0,
+            uuid_user: user.uuid_user,
+            uuid_ranch,
+            uuid_company,
+            role,
+            is_active: user.is_active,
         };
     }
 
-    async changeRole(
+    private async resolveEchoRanchUuid(
+        tenantCompany: string,
+        _jwtCompany: string,
+        _options: MembershipTenantOptions | undefined,
+        explicit?: string | null
+    ): Promise<string> {
+        const trimmed = explicit?.trim();
+        if (trimmed) {
+            return trimmed;
+        }
+        const ranchResponse = await this.ranchService.getAll({
+            page: 1,
+            size: 1,
+            sortBy: "createdAt",
+            order: "ASC",
+            status: "active",
+            uuid_company: tenantCompany,
+        });
+        const first = ranchResponse.data?.[0];
+        if (first?.uuid_ranch) {
+            return first.uuid_ranch;
+        }
+        /**
+         * Sin ranchos aún (p. ej. tras crear la compañía o pagar antes de provisionar ranchos):
+         * se devuelve `uuid_company` como eco para no romper respuestas de membresía; el cliente no debe
+         * tratarlo como UUID de rancho real hasta que exista al menos un rancho.
+         */
+        return tenantCompany;
+    }
+
+    async assignCompanyRole(
+        data: CompanyMembershipAssignBody,
+        jwtCompany: string,
+        options?: MembershipTenantOptions
+    ): Promise<ServiceResponse<UserRanchAttributes>> {
+        const { uuid_user, role } = data;
+        const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
+        const normalizedRole = normalizeUserRole(String(role));
+        if (!normalizedRole) {
+            throw new ApiError({
+                name: "ValidationError",
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Role '${role}' is not valid`,
+            });
+        }
+        this.assertAssignableRole(normalizedRole);
+
+        if (!this.isCrossTenantRequest(options) && normalizedRole === UserRole.ADMINISTRATOR) {
+            throw new ApiError({
+                name: "Forbidden",
+                statusCode: HttpStatusCodes.FORBIDDEN,
+                description: "Only a SaaS owner can grant the company administrator role",
+            });
+        }
+
+        const updated = await this.userService.update(
+            uuid_user,
+            { role: normalizedRole } as UserCreationAttributes,
+            {
+                uuid_company: tenantCompany,
+                creatorRoles: options?.actorRoles,
+            }
+        );
+
+        if (!updated.success || !updated.data) {
+            throw new ApiError({
+                name: "NotFound",
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: "User not found or inactive",
+            });
+        }
+
+        const echoRanch = await this.resolveEchoRanchUuid(tenantCompany, jwtCompany, options, data.uuid_ranch);
+
+        return {
+            success: true,
+            data: this.toMembershipRow(echoRanch, tenantCompany, updated.data),
+        };
+    }
+
+    async changeCompanyUserRole(
         uuid_user: string,
-        uuid_ranch: string,
         role: UserRole,
         jwtCompany: string,
         options?: MembershipTenantOptions
     ): Promise<ServiceResponse<UserRanchAttributes>> {
         const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        await this.validateUserAndRanch(uuid_user, uuid_ranch, tenantCompany);
-
         const normalizedRole = normalizeUserRole(String(role));
-        if (!normalizedRole || !isValidAssignableRole(normalizedRole)) {
+        if (!normalizedRole) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: `Role '${role}' is not valid`
+                description: `Role '${role}' is not valid`,
             });
         }
+        this.assertAssignableRole(normalizedRole);
 
-        const updated = await this.membershipRepository.updateRole(uuid_user, uuid_ranch, normalizedRole);
-
-        if (!updated) {
+        if (!this.isCrossTenantRequest(options) && normalizedRole === UserRole.ADMINISTRATOR) {
             throw new ApiError({
-                name: 'NotFound',
-                statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'Problem changing role'
+                name: "Forbidden",
+                statusCode: HttpStatusCodes.FORBIDDEN,
+                description: "Only a SaaS owner can grant the company administrator role",
             });
         }
 
-        if (normalizedRole === UserRole.ADMINISTRATOR) {
-            await this.syncAdministratorMembershipsAcrossCompany(uuid_user, tenantCompany);
+        const updated = await this.userService.update(
+            uuid_user,
+            { role: normalizedRole } as UserCreationAttributes,
+            {
+                uuid_company: tenantCompany,
+                creatorRoles: options?.actorRoles,
+            }
+        );
+
+        if (!updated.success || !updated.data) {
+            throw new ApiError({
+                name: "NotFound",
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: "Problem changing role",
+            });
         }
+
+        const echoRanch = await this.resolveEchoRanchUuid(tenantCompany, jwtCompany, options, null);
 
         return {
             success: true,
-            data: updated.get({ plain: true })
+            data: this.toMembershipRow(echoRanch, tenantCompany, updated.data),
         };
     }
 
-    async removeUserFromRanch(
+    async removeUserFromCompany(
         uuid_user: string,
-        uuid_ranch: string,
         jwtCompany: string,
         options?: MembershipTenantOptions
     ): Promise<ServiceResponse<null>> {
-        if (!uuid_user || !uuid_ranch) {
+        if (!uuid_user) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'uuid_user and uuid_ranch are required'
+                description: "uuid_user is required",
             });
         }
 
         const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        await this.validateUserAndRanch(uuid_user, uuid_ranch, tenantCompany);
+        const removed = await this.userService.delete(uuid_user, { uuid_company: tenantCompany });
 
-        const removed = await this.membershipRepository.remove(uuid_user, uuid_ranch);
-
-        if (!removed) {
+        if (!removed.success) {
             throw new ApiError({
-                name: 'NotFound',
+                name: "NotFound",
                 statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'Membership not found or already inactive'
+                description: "User not found or already inactive",
             });
         }
 
         return {
             success: true,
-            data: null
+            data: null,
         };
     }
 
@@ -227,29 +298,34 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
     ): Promise<ServiceResponse<UserRanchAttributes[]>> {
         if (!uuid_ranch) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'uuid_user and uuid_ranch are required'
+                description: "uuid_ranch is required",
             });
         }
 
         const tenantCompany = await this.resolveTenantCompanyForRanch(uuid_ranch, jwtCompany, options);
-        await this.ranchService.getById({ id: uuid_ranch, includeInactive: false, uuid_company: tenantCompany });
+        await this.ranchService.getById({
+            id: uuid_ranch,
+            includeInactive: false,
+            uuid_company: tenantCompany,
+        });
 
-        const {rows, count} = await this.membershipRepository.findUsersByRanch(uuid_ranch, params);
+        const scopedParams = { ...params, uuid_company: tenantCompany };
+        const { rows, count } = await this.userListPage(scopedParams);
 
-        const plainsUsers = rows.map(userRanch => userRanch.get({plain: true}));
+        const plains = rows.map((u) => this.toMembershipRow(uuid_ranch, tenantCompany, u));
 
         return {
             success: true,
-            data: plainsUsers,
+            data: plains,
             pagination: {
                 totalItems: count,
                 totalPages: Math.ceil(count / params.size),
                 currentPage: params.page,
                 order: params.order,
-                pageSize: params.size
-            }
+                pageSize: params.size,
+            },
         };
     }
 
@@ -261,118 +337,64 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
     ): Promise<ServiceResponse<UserRanchAttributes[]>> {
         if (!uuid_user) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'uuid_user and uuid_ranch are required'
+                description: "uuid_user is required",
             });
         }
 
         const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        await this.userService.getById({ id: uuid_user, includeInactive: false, uuid_company: tenantCompany });
+        const userResponse = await this.userService.getById({
+            id: uuid_user,
+            includeInactive: false,
+            uuid_company: tenantCompany,
+        });
 
-        const {rows, count} = await this.membershipRepository.findRanchesByUser(uuid_user, params);
+        if (!userResponse.success || !userResponse.data) {
+            throw new ApiError({
+                name: "NotFound",
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: "User not found",
+            });
+        }
 
-        const plainsRanches = rows.map(userRanch => userRanch.get({plain: true}));
+        const user = userResponse.data;
+        const ranchResponse = await this.ranchService.getAll({
+            ...params,
+            uuid_company: tenantCompany,
+            status: "active",
+        });
+
+        if (!ranchResponse.success || !ranchResponse.data) {
+            return {
+                success: true,
+                data: [],
+                pagination: {
+                    totalItems: 0,
+                    totalPages: 0,
+                    currentPage: params.page,
+                    order: params.order,
+                    pageSize: params.size,
+                },
+            };
+        }
+
+        const count = ranchResponse.pagination?.totalItems ?? ranchResponse.data.length;
+        const plains = ranchResponse.data.map((ranch) => this.toMembershipRow(ranch.uuid_ranch, tenantCompany, user));
 
         return {
             success: true,
-            data: plainsRanches,
+            data: plains,
             pagination: {
                 totalItems: count,
                 totalPages: Math.ceil(count / params.size),
                 currentPage: params.page,
                 order: params.order,
-                pageSize: params.size
-            }
+                pageSize: params.size,
+            },
         };
     }
 
-    private async validateUserAndRanch(uuid_user: string, uuid_ranch: string, uuid_company: string) {
-        if (!uuid_user || !uuid_ranch) {
-            throw new ApiError({
-                name: 'ValidationError',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'uuid_user and uuid_ranch are required'
-            });
-        }
-
-        const userResponse = await this.userService.getById({
-            id: uuid_user,
-            includeInactive: false,
-            uuid_company
-        });
-
-        if (!userResponse.success || !userResponse.data) {
-            throw new ApiError({
-                name: 'NotFound',
-                statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'User not found'
-            });
-        }
-
-        const ranchResponse = await this.ranchService.getById({
-            id: uuid_ranch,
-            includeInactive: false,
-            uuid_company
-        });
-
-        if (!ranchResponse.success || !ranchResponse.data) {
-            throw new ApiError({
-                name: 'NotFound',
-                statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'Ranch not found'
-            });
-        }
-
-        const user = userResponse.data;
-        const ranch = ranchResponse.data;
-
-        if (user.uuid_company !== ranch.uuid_company) {
-            throw new ApiError({
-                name: 'Forbidden',
-                statusCode: HttpStatusCodes.FORBIDDEN,
-                description: 'User and Ranch belong to different companies'
-            });
-        }
-
-        return { user, ranch };
-    }
-
-    /**
-     * Cuando un usuario pasa a ser administrador en un rancho, asegura fila activa de administrador
-     * en el resto de ranchos activos de la misma empresa donde no tenga ya una membresía activa
-     * (no modifica roles activos distintos, p. ej. ranch_staff en otro rancho).
-     */
-    private async syncAdministratorMembershipsAcrossCompany(uuid_user: string, uuid_company: string): Promise<void> {
-        const ranchResponse = await this.ranchService.getAll({
-            page: 1,
-            size: 500,
-            sortBy: 'createdAt',
-            order: 'ASC',
-            status: 'active',
-            uuid_company,
-        });
-
-        if (!ranchResponse.success || !ranchResponse.data?.length) {
-            return;
-        }
-
-        for (const ranch of ranchResponse.data) {
-            if (ranch.uuid_company !== uuid_company) {
-                continue;
-            }
-            const row = await this.membershipRepository.findMembership(uuid_user, ranch.uuid_ranch);
-            if (row?.is_active) {
-                continue;
-            }
-            await this.membershipRepository.upsertActiveMembership(uuid_user, ranch.uuid_ranch, UserRole.ADMINISTRATOR);
-        }
-    }
-
-    /**
-     * Sets the user as an active administrator on every active ranch in their company.
-     * Used when the client should not depend on a selected ranch (e.g. SaaS creating a company administrator).
-     */
     async promoteUserToCompanyAdministrator(
         uuid_user: string,
         jwtCompany: string,
@@ -380,34 +402,28 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
     ): Promise<ServiceResponse<null>> {
         if (!uuid_user?.trim()) {
             throw new ApiError({
-                name: 'ValidationError',
+                name: "ValidationError",
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'uuid_user is required',
+                description: "uuid_user is required",
             });
         }
         const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        const ranchResponse = await this.ranchService.getAll({
-            page: 1,
-            size: 500,
-            sortBy: 'createdAt',
-            order: 'ASC',
-            status: 'active',
-            uuid_company: tenantCompany,
-        });
-
-        if (!ranchResponse.success || !ranchResponse.data?.length) {
-            throw new ApiError({
-                name: 'ValidationError',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'Company has no active ranches; cannot assign a company administrator',
-            });
-        }
-
-        for (const ranch of ranchResponse.data) {
-            if (ranch.uuid_company !== tenantCompany) {
-                continue;
+        const updated = await this.userService.update(
+            uuid_user,
+            { role: UserRole.ADMINISTRATOR } as UserCreationAttributes,
+            {
+                uuid_company: tenantCompany,
+                creatorRoles: options?.actorRoles,
+                skipRoleAssignmentPolicy: true,
             }
-            await this.membershipRepository.upsertActiveMembership(uuid_user, ranch.uuid_ranch, UserRole.ADMINISTRATOR);
+        );
+
+        if (!updated.success || !updated.data) {
+            throw new ApiError({
+                name: "NotFound",
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: "User not found or inactive",
+            });
         }
 
         return {
@@ -416,16 +432,15 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
         };
     }
 
-    async syncCompanyAdministratorsToNewRanch(
-        uuid_ranch: string,
-        jwtCompany: string,
-        options?: MembershipTenantOptions
-    ): Promise<void> {
-        const tenantCompany = await this.resolveTenantCompanyForRanch(uuid_ranch, jwtCompany, options);
-        const adminUserIds = await this.membershipRepository.findUserIdsWithActiveAdministratorInCompany(tenantCompany);
-        for (const uid of adminUserIds) {
-            await this.membershipRepository.upsertActiveMembership(uid, uuid_ranch, UserRole.ADMINISTRATOR);
+    private async userListPage(
+        params: IBaseParams & { uuid_company: string }
+    ): Promise<{ rows: UserAttributes[]; count: number }> {
+        const response = await this.userService.getAll(params);
+        if (!response.success || !response.data) {
+            return { rows: [], count: 0 };
         }
+        const count = response.pagination?.totalItems ?? response.data.length;
+        return { rows: response.data, count };
     }
 }
 

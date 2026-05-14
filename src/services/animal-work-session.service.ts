@@ -7,16 +7,16 @@ import { IBaseServiceInterface } from "../interfaces/services/base-service.inter
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
-import AnimalWorkSessionModel from "../database/models/animal-work-session.model";
+import type { Model } from "sequelize";
 import { IBaseParams } from "../interfaces/params/query.interface";
 
 class AnimalWorkSessionService implements
     IBaseServiceInterface<AnimalWorkSessionAttributes, AnimalWorkSessionCreationAttributes> {
 
-    private readonly repository: IBaseRepository<AnimalWorkSessionModel, AnimalWorkSessionCreationAttributes>;
+    private readonly repository: IBaseRepository<Model<AnimalWorkSessionAttributes, AnimalWorkSessionCreationAttributes>, AnimalWorkSessionCreationAttributes>;
 
     constructor(
-        repository: IBaseRepository<AnimalWorkSessionModel, AnimalWorkSessionCreationAttributes>
+        repository: IBaseRepository<Model<AnimalWorkSessionAttributes, AnimalWorkSessionCreationAttributes>, AnimalWorkSessionCreationAttributes>
     ) {
         this.repository = repository;
     }
@@ -37,7 +37,7 @@ class AnimalWorkSessionService implements
         };
     }
 
-    async create(body: AnimalWorkSessionCreationAttributes): Promise<ServiceResponse<AnimalWorkSessionAttributes>> {
+    async create(body: AnimalWorkSessionCreationAttributes, _options?: unknown): Promise<ServiceResponse<AnimalWorkSessionAttributes>> {
         const created = await this.repository.create(body);
         return { success: true, data: created.get({ plain: true }) };
     }

@@ -22,9 +22,7 @@ import PasswordValidatorService from "../services/password/password-validator.se
 import MembershipRepository from "../repositories/membership.repository";
 import MembershipService from "../services/membership.service";
 import MembershipController from "../controllers/membership.controller";
-import CompanyOnboardingRepository from "../repositories/company-onboarding.repository";
 import TenantProvisioningService from "../services/tenant-provisioning.service";
-import CompanyOnboardingService from "../services/company-onboarding.service";
 import ReferenceSampleRepository from "../repositories/reference-sample.repository";
 import ReferenceSampleService from "../services/reference-sample.service";
 import ReferenceSampleController from "../controllers/reference-sample.controller";
@@ -43,14 +41,14 @@ const animalWorkSessionRepository = new AnimalWorkSessionRepository();
 const sessionRepository = new SessionRepository();
 const authenticationRepository = new AuthenticationRepository();
 const membershipRepository = new MembershipRepository();
-const companyOnboardingRepository = new CompanyOnboardingRepository();
 const referenceSampleRepository = new ReferenceSampleRepository();
 const companyPaymentRepository = new CompanyPaymentRepository();
 const ownerRepository = new OwnerRepository();
 
 //Services
 const passwordValidatorService = new PasswordValidatorService();
-const companyService = new CompanyService(companyRepository, companyPaymentRepository);
+const tenantProvisioningService = new TenantProvisioningService();
+const companyService = new CompanyService(companyRepository, companyPaymentRepository, tenantProvisioningService);
 const userService = new UserService(userRepository, userRepository, companyService, passwordValidatorService);
 const ranchService = new RanchService(ranchRepository);
 const animalService = new AnimalService(animalRepository, companyService);
@@ -61,22 +59,16 @@ const authenticationService = new AuthenticationService(
     sessionService,
     userService,
     membershipRepository
-)
-const membershipService = new MembershipService(membershipRepository, userService, ranchService);
-const tenantProvisioningService = new TenantProvisioningService();
-const companyOnboardingService = new CompanyOnboardingService(
-    companyOnboardingRepository,
-    tenantProvisioningService,
-    passwordValidatorService
 );
+const membershipService = new MembershipService(userService, ranchService);
 const referenceSampleService = new ReferenceSampleService(referenceSampleRepository);
 const companyPaymentService = new CompanyPaymentService(companyPaymentRepository, companyService);
 
 //Controllers
 const userController = new UserController(userService, userService);
-const companyController = new CompanyController(companyService, companyOnboardingService);
+const companyController = new CompanyController(companyService);
 const animalController = new AnimalController(animalService);
-const ranchController = new RanchController(ranchService, membershipService);
+const ranchController = new RanchController(ranchService);
 const animalWorkSessionController = new AnimalWorkSessionController(animalWorkSessionService);
 const authenticationController = new AuthenticationController(authenticationService);
 const membershipController = new MembershipController(membershipService);

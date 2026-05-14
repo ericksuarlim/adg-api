@@ -8,7 +8,6 @@ import { AUTHORIZATION_SCHEME_BEARER } from "../constants/auth.constants";
 import { CompanyModel, SessionModel } from "../database/models";
 import { normalizeUserRoles, UserRole } from "../interfaces/roles/roles.interface";
 import { Op } from "sequelize";
-import { membershipRepository } from "../containers/container";
 import { computeAccessScope } from "../helpers/access-scope.helper";
 
 const isJwtPayload = (value: unknown): value is JwtPayload => {
@@ -86,10 +85,6 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         decoded.roles = roles;
 
         decoded.access_scope = computeAccessScope(roles);
-        if (!Array.isArray(decoded.ranch_uuids)) {
-            const ranchIds = await membershipRepository.findActiveRanchIdsByUser(decoded.sub, decoded.uuid_company);
-            decoded.ranch_uuids = decoded.access_scope === "saas_global" ? [] : ranchIds;
-        }
 
         const isSaasOwner = roles.includes(UserRole.SAAS_OWNER);
         if (!isSaasOwner) {

@@ -1,0 +1,21 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const company_payment_routes_1 = __importDefault(require("./company-payment.routes"));
+const companyRoutes = (0, express_1.Router)();
+companyRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.createCompany);
+companyRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_READ), container_1.container.companyController.getCompanies);
+companyRoutes.get('/:uuid_company', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_READ), container_1.container.companyController.getCompany);
+companyRoutes.put('/:uuid_company', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_WRITE), container_1.container.companyController.updateCompany);
+companyRoutes.post('/:uuid_company/activate-trial', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.activateTrial);
+companyRoutes.post('/:uuid_company/end-subscription', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.endCompanySubscription);
+companyRoutes.post('/:uuid_company/reactivate', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.reactivateCompany);
+companyRoutes.delete('/:uuid_company', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.deleteCompany);
+companyRoutes.use('/:uuid_company/payments', company_payment_routes_1.default);
+exports.default = companyRoutes;

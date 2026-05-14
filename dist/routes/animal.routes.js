@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const animalRoutes = (0, express_1.Router)();
+animalRoutes.get("/breeds", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_READ), container_1.container.animalController.listBreeds);
+animalRoutes.get("/parents", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_READ), container_1.container.animalController.listParentCandidates);
+animalRoutes.get("/", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_READ), container_1.container.animalController.getAnimals);
+animalRoutes.post("/", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WRITE), container_1.container.animalController.createAnimal);
+animalRoutes.get("/:uuid_animal", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_READ), container_1.container.animalController.getAnimal);
+animalRoutes.put("/:uuid_animal", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WRITE), container_1.container.animalController.updateAnimal);
+animalRoutes.delete("/:uuid_animal", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WRITE), container_1.container.animalController.deleteAnimal);
+exports.default = animalRoutes;

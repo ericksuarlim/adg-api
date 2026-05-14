@@ -120,6 +120,22 @@ class CompanyRepository implements
 
         return updated[0];
     }
+
+    async updateTenantProvisioning(
+        uuid_company: string,
+        fields: { tenant_database: string; tenant_schema_version: number }
+    ): Promise<CompanyModel | null> {
+        const [count, updated] = await CompanyModel.update(fields, {
+            where: { uuid_company },
+            returning: true,
+        });
+
+        if (count === 0) {
+            return null;
+        }
+
+        return updated[0];
+    }
 }
 
 export default CompanyRepository;

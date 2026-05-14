@@ -8,8 +8,6 @@ import {
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { handleResponse } from "../utils/response.handler";
-import { ICompanyOnboardingService } from "../interfaces/services/company-onboarding-service.interface";
-import { CompanyOnboardingData } from "../interfaces/company/company-onboarding.interface";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 import { UserRole } from "../interfaces/roles/roles.interface";
 import CompanyService from "../services/company.service";
@@ -17,14 +15,9 @@ import { assertTenantCompany } from "../helpers/access-scope.helper";
 
 class CompanyController {
     private readonly companyService: CompanyService;
-    private readonly companyOnboardingService: ICompanyOnboardingService;
 
-    constructor(
-        companyService: CompanyService,
-        companyOnboardingService: ICompanyOnboardingService
-    ) {
+    constructor(companyService: CompanyService) {
         this.companyService = companyService;
-        this.companyOnboardingService = companyOnboardingService;
     }
 
     private isSaasOwner(req: AuthRequest): boolean {
@@ -35,17 +28,6 @@ class CompanyController {
         try {
             const reqBody = req.body as CompanyCreationAttributes;
             const response = await this.companyService.create(reqBody);
-
-            return handleResponse(res, response, 201);
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    onboardCompanyWithOwner = async (req: Request, res: Response, next: NextFunction) => {
-        try {
-            const reqBody = req.body as CompanyOnboardingData;
-            const response = await this.companyOnboardingService.onboardCompany(reqBody);
 
             return handleResponse(res, response, 201);
         } catch (error) {

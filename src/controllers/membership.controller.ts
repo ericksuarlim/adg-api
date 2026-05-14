@@ -1,91 +1,116 @@
 import { Request, Response, NextFunction } from "express";
-import { IMembershipService, MembershipTenantOptions } from "../interfaces/services/membership-service.interface";
-import {UserRanchAttributes, UserRanchCreationAttributes} from "../interfaces/ranch/user-ranch.interface";
 import {
-    IGetMembershipByRanchParams,
-    IGetMembershipByUserParams,
-    IGetRoleMembershipParams,
-    IRemoveRoleMembershipParams
-} from "../interfaces/params/membershipParams.interface";
-import {buildGetAllParams} from "../utils/query.builder";
+    CompanyMembershipAssignBody,
+    IMembershipService,
+    MembershipTenantOptions,
+} from "../interfaces/services/membership-service.interface";
+import { IGetMembershipByRanchParams, IGetMembershipByUserParams } from "../interfaces/params/membershipParams.interface";
+import { buildGetAllParams } from "../utils/query.builder";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
-import { normalizeUserRoles, UserRole } from "../interfaces/roles/roles.interface";
+import { normalizeUserRole, normalizeUserRoles, UserRole } from "../interfaces/roles/roles.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+
+interface ICompanyUserMembershipParams {
+    uuid_user: string;
+}
 
 class MembershipController {
-    private readonly membershipService: IMembershipService<UserRanchAttributes, UserRanchCreationAttributes>;
+    private readonly membershipService: IMembershipService;
 
-    constructor(membershipService: IMembershipService<UserRanchAttributes, UserRanchCreationAttributes>) {
+    constructor(membershipService: IMembershipService) {
         this.membershipService = membershipService;
     }
 
-    private tenantOptions(req: AuthRequest): MembershipTenantOptions {
-        const roles = normalizeUserRoles(req.user?.roles ?? []);
-        return { allowCrossTenant: roles.includes(UserRole.SAAS_OWNER) };
+    private membershipOptions(req: AuthRequest): MembershipTenantOptions {
+        const roles = (req.user?.roles ?? []) as string[];
+        return {
+            allowCrossTenant: roles.includes(UserRole.SAAS_OWNER),
+            actorRoles: normalizeUserRoles(roles),
+        };
     }
 
     assign = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
-            const response = await this.membershipService.assignUserToRanch(
-                req.body,
+            const response = await this.membershipService.assignCompanyRole(
+                req.body as CompanyMembershipAssignBody,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(201).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 
     promoteCompanyAdministrator = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
+            const roles = (req.user?.roles ?? []) as string[];
+            if (!roles.includes(UserRole.SAAS_OWNER)) {
+                throw new ApiError({
+                    name: "Forbidden",
+                    statusCode: HttpStatusCodes.FORBIDDEN,
+                    description: "Only a SaaS owner can promote a company administrator",
+                });
+            }
             const { uuid_user } = req.body as { uuid_user?: string };
             const response = await this.membershipService.promoteUserToCompanyAdministrator(
                 uuid_user as string,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 
-    changeRole = async (req: AuthRequest & Request<IGetRoleMembershipParams>, res: Response, next: NextFunction) => {
+    changeRole = async (
+        req: AuthRequest & Request<ICompanyUserMembershipParams>,
+        res: Response,
+        next: NextFunction
+    ) => {
         try {
-            const { uuid_user, uuid_ranch } = req.params;
-            const { role } = req.body;
-            const response = await this.membershipService.changeRole(
+            const { uuid_user } = req.params;
+            const { role } = req.body as { role?: UserRole };
+            const normalized = normalizeUserRole(String(role ?? ""));
+            if (!normalized) {
+                throw new ApiError({
+                    name: "ValidationError",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: "role is required",
+                });
+            }
+            const response = await this.membershipService.changeCompanyUserRole(
                 uuid_user,
-                uuid_ranch,
-                role,
+                normalized,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 
-    remove = async (req: AuthRequest & Request<IRemoveRoleMembershipParams>, res: Response, next: NextFunction) => {
+    remove = async (req: AuthRequest & Request<ICompanyUserMembershipParams>, res: Response, next: NextFunction) => {
         try {
-            const { uuid_user, uuid_ranch } = req.params;
+            const { uuid_user } = req.params;
 
-            const response = await this.membershipService.removeUserFromRanch(
+            const response = await this.membershipService.removeUserFromCompany(
                 uuid_user,
-                uuid_ranch,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 
     getUsersByRanch = async (req: AuthRequest & Request<IGetMembershipByRanchParams>, res: Response, next: NextFunction) => {
         try {
@@ -96,14 +121,14 @@ class MembershipController {
                 uuid_ranch,
                 params,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 
     getRanchesByUser = async (req: AuthRequest & Request<IGetMembershipByUserParams>, res: Response, next: NextFunction) => {
         try {
@@ -114,14 +139,14 @@ class MembershipController {
                 uuid_user,
                 params,
                 req.user?.uuid_company as string,
-                this.tenantOptions(req)
+                this.membershipOptions(req)
             );
 
             return res.status(200).json(response);
         } catch (error) {
             next(error);
         }
-    }
+    };
 }
 
 export default MembershipController;

@@ -7,6 +7,7 @@
     "dev": "npx ts-node-dev --respawn --transpile-only src/server.ts",
     "dev:debug": "npx ts-node-dev --respawn --transpile-only --inspect=0.0.0.0:9230 src/server.ts",
     "build": "tsc",
+    "seed:saas-owner": "npx ts-node --transpile-only -r dotenv/config src/scripts/seed-saas-owner.ts",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

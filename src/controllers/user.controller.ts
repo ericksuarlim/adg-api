@@ -12,9 +12,10 @@ import { handleResponse } from '../utils/response.handler';
 import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
 import { IBaseParams, IncludeInactiveQuery } from '../interfaces/params/query.interface';
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
-import { UserRole } from "../interfaces/roles/roles.interface";
+import { UserRole, normalizeUserRoles } from "../interfaces/roles/roles.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
+import UserService from "../services/user.services";
 
 class UserController {
     private readonly userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
@@ -38,7 +39,10 @@ class UserController {
             if (!this.isSaasOwner(req)) {
                 userBody.uuid_company = req.user?.uuid_company as string;
             }
-            const response = await this.userService.create(userBody);
+            const response = await (this.userService as UserService).create(
+                userBody,
+                normalizeUserRoles((req.user?.roles ?? []) as string[])
+            );
 
             return handleResponse(res, response, 201);
         } catch (error) {
@@ -131,7 +135,14 @@ class UserController {
                 userBody.uuid_company = req.user?.uuid_company as string;
                 delete (userBody as { password?: string }).password;
             }
-            const response = await this.userService.update(uuid_user, userBody, { uuid_company: tenantScope });
+            const response = await (this.userService as UserService).update(
+                uuid_user,
+                userBody,
+                {
+                    uuid_company: tenantScope,
+                    creatorRoles: normalizeUserRoles((req.user?.roles ?? []) as string[]),
+                }
+            );
 
             return handleResponse(res, response, 200);
         } catch (error) {

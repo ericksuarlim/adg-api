@@ -1,13 +1,14 @@
-import { AnimalCreationAttributes } from "../interfaces/animal/animal.interface";
-import { AnimalSex } from "../interfaces/animal/animal.interface";
+import { AnimalCreationAttributes, AnimalAttributes, AnimalSex } from "../interfaces/animal/animal.interface";
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
-import AnimalModel from "../database/models/animal.model";
 import { Status } from "../interfaces/params/query.interface";
-import RanchModel from "../database/models/ranch.model";
 import { Op } from "sequelize";
+import type { Model } from "sequelize";
+import { requireTenantModels } from "../database/tenant/tenant-request-context";
+
+type AnimalRow = Model<AnimalAttributes, AnimalCreationAttributes>;
 
 class AnimalRepository implements
-    IBaseRepository<AnimalModel, AnimalCreationAttributes> {
+    IBaseRepository<AnimalRow, AnimalCreationAttributes> {
 
     async findAll(
         params: {
@@ -19,7 +20,8 @@ class AnimalRepository implements
             uuid_company?: string;
             uuid_ranch_in?: string[];
         }
-    ): Promise<{ rows: AnimalModel[]; count: number }> {
+    ): Promise<{ rows: AnimalRow[]; count: number }> {
+        const { AnimalModel, RanchModel } = requireTenantModels();
         const { page, size, sortBy, order, status } = params;
         const offset = (page - 1) * size;
 
@@ -57,7 +59,8 @@ class AnimalRepository implements
 
     async findById(
         params: { id: string; includeInactive?: boolean; uuid_company?: string; uuid_ranch_in?: string[] }
-    ): Promise<AnimalModel | null> {
+    ): Promise<AnimalRow | null> {
+        const { AnimalModel, RanchModel } = requireTenantModels();
         const { id, includeInactive, uuid_company, uuid_ranch_in } = params;
         const where: Record<string, unknown> = { animal_uuid: id };
         if (!includeInactive) {
@@ -83,14 +86,16 @@ class AnimalRepository implements
         return await AnimalModel.findOne({ where, include });
     }
 
-    async create(data: AnimalCreationAttributes): Promise<AnimalModel> {
+    async create(data: AnimalCreationAttributes): Promise<AnimalRow> {
+        const { AnimalModel } = requireTenantModels();
         return await AnimalModel.create(data);
     }
 
     async update(
         animal_uuid: string,
         data: AnimalCreationAttributes
-    ): Promise<AnimalModel | null> {
+    ): Promise<AnimalRow | null> {
+        const { AnimalModel } = requireTenantModels();
         const [count, updated] = await AnimalModel.update(data, {
             where: { animal_uuid, is_active: true },
             returning: true,
@@ -101,15 +106,17 @@ class AnimalRepository implements
     }
 
     async delete(animal_uuid: string, options?: { uuid_company?: string; uuid_ranch_in?: string[] }): Promise<boolean> {
+        const { AnimalModel, RanchModel } = requireTenantModels();
         let canDelete = true;
         if (options?.uuid_company || options?.uuid_ranch_in?.length) {
             const current = await AnimalModel.findOne({ where: { animal_uuid, is_active: true } });
             if (current) {
-                if (options.uuid_ranch_in?.length && !options.uuid_ranch_in.includes(current.ranch_uuid)) {
+                const plain = current.get({ plain: true }) as AnimalAttributes;
+                if (options.uuid_ranch_in?.length && !options.uuid_ranch_in.includes(plain.ranch_uuid)) {
                     canDelete = false;
                 } else {
                     const ranchWhere: Record<string, unknown> = {
-                        uuid_ranch: current.ranch_uuid,
+                        uuid_ranch: plain.ranch_uuid,
                         is_active: true,
                     };
                     if (options.uuid_company) {
@@ -131,6 +138,7 @@ class AnimalRepository implements
     }
 
     async countActiveByCompany(uuid_company: string): Promise<number> {
+        const { AnimalModel, RanchModel } = requireTenantModels();
         return AnimalModel.count({
             where: { is_active: true },
             distinct: true,
@@ -150,6 +158,7 @@ class AnimalRepository implements
         registration_number: string,
         options?: { excludeAnimalUuid?: string }
     ): Promise<string | null> {
+        const { AnimalModel } = requireTenantModels();
         const where: Record<string, unknown> = {
             ranch_uuid,
             registration_number: registration_number.trim(),
@@ -169,6 +178,7 @@ class AnimalRepository implements
         ranch_uuid: string,
         sex: AnimalSex
     ): Promise<{ animal_uuid: string; registration_number: string }[]> {
+        const { AnimalModel } = requireTenantModels();
         const rows = await AnimalModel.findAll({
             where: { ranch_uuid, sex, is_active: true },
             attributes: ['animal_uuid', 'registration_number'],
@@ -185,6 +195,7 @@ class AnimalRepository implements
         registration_number: string,
         sex: AnimalSex
     ): Promise<string | null> {
+        const { AnimalModel } = requireTenantModels();
         const row = await AnimalModel.findOne({
             where: {
                 ranch_uuid,

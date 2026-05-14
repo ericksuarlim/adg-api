@@ -1,6 +1,7 @@
 import { Model, DataTypes } from 'sequelize';
 import sequelize from '../../database';
 import { UserAttributes, UserCreationAttributes } from "../../interfaces/user/user.interface";
+import { UserRole } from "../../interfaces/roles/roles.interface";
 
 class UserModel extends Model <UserAttributes, UserCreationAttributes>
     implements UserAttributes {
@@ -18,6 +19,7 @@ class UserModel extends Model <UserAttributes, UserCreationAttributes>
 
     declare phone?: string | null;
     declare is_active: boolean;
+    declare role: UserRole;
 
     declare created_at: Date;
     declare updated_at: Date;
@@ -72,6 +74,14 @@ UserModel.init(
             type: DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: true,
+        },
+        role: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            defaultValue: UserRole.RANCH_STAFF,
+            validate: {
+                isIn: [Object.values(UserRole)],
+            },
         },
     },
     {

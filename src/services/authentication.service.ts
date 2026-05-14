@@ -15,7 +15,7 @@ import { UserRole } from "../interfaces/roles/roles.interface";
 import { computeAccessScope } from "../helpers/access-scope.helper";
 import { SESSION_EXPIRATION_TIME } from "../constants/auth.constants";
 import { IMembershipRepository } from "../interfaces/repositories/membership-repository.interface";
-import { CompanyModel, UserRanchModel } from "../database/models";
+import { CompanyModel } from "../database/models";
 import { normalizeLoginCredential } from '../utils/login-credential.util';
 
 class AuthenticationService implements IAuthenticationService {
@@ -23,13 +23,13 @@ class AuthenticationService implements IAuthenticationService {
     private readonly sessionService: ISessionService<SessionAttributes>;
     private readonly SESSION_EXPIRATION_TIME = SESSION_EXPIRATION_TIME;
     private readonly userManagerService: IUserManagerServiceInterface<UserAttributes>;
-    private readonly membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>;
+    private readonly membershipRepository: IMembershipRepository;
 
     constructor(
         authenticationRepository: IAuthenticationDBRepository,
         sessionService: ISessionService<SessionAttributes>,
         userManagerService: IUserManagerServiceInterface<UserAttributes>,
-        membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>
+        membershipRepository: IMembershipRepository
     ) {
         this.authenticationRepository = authenticationRepository;
         this.sessionService = sessionService;
@@ -87,12 +87,9 @@ class AuthenticationService implements IAuthenticationService {
             ? membershipRoles
             : [UserRole.RANCH_STAFF];
 
-        const ranchIds = await this.membershipRepository.findActiveRanchIdsByUser(
-            user.uuid_user,
-            user.uuid_company
-        );
         const access_scope = computeAccessScope(roles);
-        const ranch_uuids = access_scope === "saas_global" ? [] : ranchIds;
+        /** Operational scope is company-wide; ranch UUIDs are not embedded in JWT (legacy `single_ranch` unused). */
+        const ranch_uuids: string[] = [];
 
         const company = await CompanyModel.findOne({
             where: {

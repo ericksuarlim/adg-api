@@ -4,18 +4,13 @@ import { CompanyModel, UserModel } from "../database/models";
 import {IBaseRepository} from "../interfaces/repositories/base-repository.interface";
 import { normalizeLoginCredential } from "../utils/login-credential.util";
 import { Op, fn, col, where } from "sequelize";
+import { IBaseParams } from "../interfaces/params/query.interface";
 
 class UserRepository implements
     IBaseRepository<UserModel, UserCreationAttributes>,
     IUserManagerRepository<UserModel> {
 
-    async findAll(params: {
-        page: number;
-        size: number;
-        sortBy: string;
-        order: 'ASC' | 'DESC';
-        status?: 'all' | 'active' | 'inactive';
-    }): Promise<{rows: UserModel[], count: number}> {
+    async findAll(params: IBaseParams): Promise<{rows: UserModel[], count: number}> {
 
         const { page, size, sortBy, order, status } = params;
 

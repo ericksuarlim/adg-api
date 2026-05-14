@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+require("./models/company.model");
+require("./models/user.model");
+require("./models/session.model");
+require("./models/user-ranch.model");
+require("./models/company-payment.model");
+require("./models/reference-sample.model");
+require("./models/ranch-company-route.model");
+require("./saas-models.associations");

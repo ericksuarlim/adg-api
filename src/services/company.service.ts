@@ -2,24 +2,29 @@ import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/comp
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
-import ApiError from "../errors/apiError";
-import HttpStatusCodes from "../errors/httpStatusCodes";
-import { CompanyModel } from "../database/models";
+import CompanyRepository from "../repositories/company.repository";
 import {IBaseParams} from "../interfaces/params/query.interface";
 import CompanyPaymentModel from "../database/models/company-payment.model";
 import { CompanyPaymentCreationAttributes } from "../interfaces/company/company-payment.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
+import { ITenantProvisioningService } from "../interfaces/services/tenant-provisioning-service.interface";
+import { attachOperationalTenantToCompany } from "../helpers/company-operational-tenant.helper";
 
 class CompanyService implements IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes> {
 
-    private readonly companyRepository: IBaseRepository<CompanyModel, CompanyCreationAttributes>;
+    private readonly companyRepository: CompanyRepository;
     private readonly companyPaymentRepository: IBaseRepository<CompanyPaymentModel, CompanyPaymentCreationAttributes>;
+    private readonly tenantProvisioningService: ITenantProvisioningService;
 
     constructor(
-        companyRepository: IBaseRepository<CompanyModel, CompanyCreationAttributes>,
+        companyRepository: CompanyRepository,
         companyPaymentRepository: IBaseRepository<CompanyPaymentModel, CompanyPaymentCreationAttributes>,
+        tenantProvisioningService: ITenantProvisioningService,
     ) {
         this.companyRepository = companyRepository;
         this.companyPaymentRepository = companyPaymentRepository;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     async getAll(params: IBaseParams): Promise<ServiceResponse<CompanyAttributes[]>> {
@@ -41,13 +46,32 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         };
     }
 
-    async create(companyBody: CompanyCreationAttributes): Promise<ServiceResponse<CompanyAttributes>> {
+    async create(companyBody: CompanyCreationAttributes, _options?: unknown): Promise<ServiceResponse<CompanyAttributes>> {
         const payload = this.buildCompanyCreatePayload(companyBody);
         const company = await this.companyRepository.create(payload);
+        const uuid_company = company.uuid_company;
+
+        await attachOperationalTenantToCompany(
+            uuid_company,
+            this.tenantProvisioningService,
+            this.companyRepository
+        );
+
+        const refreshed = await this.companyRepository.findById({
+            id: uuid_company,
+            includeInactive: true,
+        });
+        if (!refreshed) {
+            throw new ApiError({
+                name: 'InternalError',
+                statusCode: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+                description: 'Company not found after tenant provisioning',
+            });
+        }
 
         return {
             success: true,
-            data: company.get({ plain: true })
+            data: refreshed.get({ plain: true })
         };
     }
 
@@ -316,13 +340,13 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             });
         }
 
-        const payload: CompanyCreationAttributes = {
+        const payload: Partial<CompanyCreationAttributes> = {
             membership_status: 'TRIAL',
             membership_started_at: startDate,
             membership_renewal_at: endDate,
             is_active: true
         };
-        const updatedCompany = await this.update(uuid_company, payload, tenantContext);
+        const updatedCompany = await this.update(uuid_company, payload as CompanyCreationAttributes, tenantContext);
 
         await this.companyPaymentRepository.create({
             uuid_company,

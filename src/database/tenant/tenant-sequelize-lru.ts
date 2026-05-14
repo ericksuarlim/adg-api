@@ -1,0 +1,83 @@
+import { Sequelize } from 'sequelize';
+import dbConfig from '../../config/database.config';
+import { envConfig } from '../../config/env.config';
+import { DEFAULT_TENANT_POOL_MAX } from '../../constants/tenant.constants';
+import { buildTenantModelsForSequelize, TenantDomainModels } from './tenant-models.factory';
+import { syncTenantOperationalSchema } from './tenant-schema.service';
+
+type PoolEntry = {
+    sequelize: Sequelize;
+    models: TenantDomainModels;
+    lastUsed: number;
+};
+
+const pool = new Map<string, PoolEntry>();
+const accessOrder: string[] = [];
+
+function maxPoolSize(): number {
+    const raw = envConfig.TENANT_POOL_MAX;
+    if (raw == null || Number.isNaN(Number(raw))) {
+        return DEFAULT_TENANT_POOL_MAX;
+    }
+    return Math.max(1, Math.min(256, Number(raw)));
+}
+
+function touchOrder(databaseName: string): void {
+    const idx = accessOrder.indexOf(databaseName);
+    if (idx >= 0) {
+        accessOrder.splice(idx, 1);
+    }
+    accessOrder.push(databaseName);
+}
+
+async function evictIfNeeded(): Promise<void> {
+    const max = maxPoolSize();
+    while (pool.size >= max && accessOrder.length > 0) {
+        const victim = accessOrder.shift();
+        if (!victim) {
+            break;
+        }
+        const entry = pool.get(victim);
+        if (entry) {
+            pool.delete(victim);
+            await entry.sequelize.close().catch(() => undefined);
+        }
+    }
+}
+
+/**
+ * LRU-ish pool of Sequelize instances keyed by tenant PostgreSQL database name.
+ */
+export async function getTenantPoolEntry(databaseName: string): Promise<PoolEntry> {
+    const existing = pool.get(databaseName);
+    if (existing) {
+        existing.lastUsed = Date.now();
+        touchOrder(databaseName);
+        return existing;
+    }
+
+    await evictIfNeeded();
+
+    const sequelize = new Sequelize(databaseName, dbConfig.user as string, dbConfig.password as string, {
+        host: dbConfig.host,
+        port: Number(dbConfig.port),
+        dialect: 'postgres',
+        logging: false,
+        dialectOptions: dbConfig.dialectOptions,
+    });
+
+    const models = buildTenantModelsForSequelize(sequelize);
+    await syncTenantOperationalSchema(sequelize, models);
+    const entry: PoolEntry = { sequelize, models, lastUsed: Date.now() };
+    pool.set(databaseName, entry);
+    touchOrder(databaseName);
+    return entry;
+}
+
+export async function closeAllTenantPoolConnections(): Promise<void> {
+    for (const [, entry] of pool) {
+        await entry.sequelize.close().catch(() => undefined);
+    }
+    pool.clear();
+    accessOrder.length = 0;
+}

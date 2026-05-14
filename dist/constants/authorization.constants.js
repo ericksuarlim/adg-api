@@ -1,0 +1,46 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PERMISSION_ROLE_MAP = exports.Permission = void 0;
+const roles_interface_1 = require("../interfaces/roles/roles.interface");
+var Permission;
+(function (Permission) {
+    /** Listar / operar todas las compañías (solo SaaS). */
+    Permission["COMPANY_READ"] = "COMPANY_READ";
+    /** Alta / baja global de compañía (solo SaaS). */
+    Permission["COMPANY_WRITE"] = "COMPANY_WRITE";
+    /** Ver compañía concreta, pagos, etc. (SaaS o administrador de esa compañía). */
+    Permission["COMPANY_TENANT_READ"] = "COMPANY_TENANT_READ";
+    /** Actualizar datos de la propia compañía y pagos (SaaS o administrador de esa compañía). */
+    Permission["COMPANY_TENANT_WRITE"] = "COMPANY_TENANT_WRITE";
+    Permission["USER_READ"] = "USER_READ";
+    Permission["USER_WRITE"] = "USER_WRITE";
+    Permission["RANCH_READ"] = "RANCH_READ";
+    /** Crear / editar / eliminar rancho (solo SaaS y administrador). */
+    Permission["RANCH_WRITE"] = "RANCH_WRITE";
+    Permission["MEMBERSHIP_READ"] = "MEMBERSHIP_READ";
+    Permission["MEMBERSHIP_WRITE"] = "MEMBERSHIP_WRITE";
+    Permission["ANIMAL_READ"] = "ANIMAL_READ";
+    Permission["ANIMAL_WRITE"] = "ANIMAL_WRITE";
+    Permission["ANIMAL_WORK_SESSION_READ"] = "ANIMAL_WORK_SESSION_READ";
+    Permission["ANIMAL_WORK_SESSION_WRITE"] = "ANIMAL_WORK_SESSION_WRITE";
+    Permission["REFERENCE_SAMPLE_READ"] = "REFERENCE_SAMPLE_READ";
+    Permission["REFERENCE_SAMPLE_WRITE"] = "REFERENCE_SAMPLE_WRITE";
+})(Permission || (exports.Permission = Permission = {}));
+exports.PERMISSION_ROLE_MAP = {
+    [Permission.COMPANY_READ]: [roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.COMPANY_WRITE]: [roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.COMPANY_TENANT_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.COMPANY_TENANT_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.USER_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.USER_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.RANCH_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.RANCH_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.MEMBERSHIP_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.MEMBERSHIP_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.ANIMAL_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.ANIMAL_WRITE]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.ANIMAL_WORK_SESSION_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.ANIMAL_WORK_SESSION_WRITE]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.REFERENCE_SAMPLE_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.REFERENCE_SAMPLE_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+};

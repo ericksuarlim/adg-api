@@ -1,4 +1,5 @@
 import { Optional } from "sequelize";
+import { UserRole } from "../roles/roles.interface";
 
 export interface UserAttributes {
     uuid_user: string;
@@ -15,9 +16,10 @@ export interface UserAttributes {
 
     phone?: string | null;
     is_active: boolean;
+    role: UserRole;
 
     created_at?: Date;
     updated_at?: Date;
 }
 
-export type UserCreationAttributes = Optional<UserAttributes, 'uuid_user' | 'phone' | 'second_last_name' |'is_active' | 'created_at' | 'updated_at'>;
+export type UserCreationAttributes = Optional<UserAttributes, 'uuid_user' | 'phone' | 'second_last_name' |'is_active' | 'created_at' | 'updated_at' | 'role'>;

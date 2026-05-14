@@ -5,9 +5,7 @@ import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { IDeleteRanchParams, IGetRanchParams, IUpdateRanchParams } from "../interfaces/params/ranchParams.interface";
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
-import { UserRole, normalizeUserRoles } from "../interfaces/roles/roles.interface";
-import { MembershipTenantOptions } from "../interfaces/services/membership-service.interface";
-import MembershipService from "../services/membership.service";
+import { UserRole } from "../interfaces/roles/roles.interface";
 import {
     assertRanchTokenAccess,
     ranchFilterFromUser,
@@ -19,23 +17,13 @@ import RanchService from "../services/ranch.service";
 
 class RanchController {
     private readonly ranchService: RanchService;
-    private readonly membershipService: MembershipService;
 
-    constructor(
-        ranchService: RanchService,
-        membershipService: MembershipService
-    ) {
+    constructor(ranchService: RanchService) {
         this.ranchService = ranchService;
-        this.membershipService = membershipService;
     }
 
     private isSaasOwner(req: AuthRequest): boolean {
         return (req.user?.roles ?? []).includes(UserRole.SAAS_OWNER);
-    }
-
-    private membershipTenantOptions(req: AuthRequest): MembershipTenantOptions {
-        const roles = normalizeUserRoles((req.user?.roles ?? []) as string[]);
-        return { allowCrossTenant: roles.includes(UserRole.SAAS_OWNER) };
     }
 
     createRanch = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -67,13 +55,6 @@ class RanchController {
             }
 
             const created = response.data;
-            if (created?.uuid_ranch) {
-                await this.membershipService.syncCompanyAdministratorsToNewRanch(
-                    created.uuid_ranch,
-                    req.user?.uuid_company as string,
-                    this.membershipTenantOptions(req)
-                );
-            }
 
             return handleResponse(res, response, 201);
         } catch (error) {

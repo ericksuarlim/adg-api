@@ -4,16 +4,19 @@ import { IBaseServiceInterface } from "../interfaces/services/base-service.inter
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
-import { RanchModel } from "../database/models";
+import type { Model } from "sequelize";
 import PaddockRepository from "../repositories/paddock.repository";
+import { RanchCompanyRouteModel } from "../database/models";
+
+type RanchRow = Model<RanchAttributes, RanchCreationAttributes>;
 
 class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreationAttributes> {
 
-    private readonly ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>;
+    private readonly ranchRepository: IBaseRepository<RanchRow, RanchCreationAttributes>;
     private readonly paddockRepository: PaddockRepository;
 
     constructor(
-        ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>,
+        ranchRepository: IBaseRepository<RanchRow, RanchCreationAttributes>,
         paddockRepository?: PaddockRepository
     ) {
         this.ranchRepository = ranchRepository;
@@ -48,12 +51,17 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         };
     }
 
-    async create(ranchBody: RanchCreationAttributes): Promise<ServiceResponse<RanchAttributes>> {
+    async create(ranchBody: RanchCreationAttributes, _options?: unknown): Promise<ServiceResponse<RanchAttributes>> {
         const ranch = await this.ranchRepository.create(ranchBody);
+        const plain = ranch.get({ plain: true }) as RanchAttributes;
+        await RanchCompanyRouteModel.create({
+            uuid_ranch: plain.uuid_ranch,
+            uuid_company: plain.uuid_company,
+        });
 
         return {
             success: true,
-            data: ranch.get({ plain: true })
+            data: plain
         };
     }
 
@@ -136,6 +144,8 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
                 description: 'Ranch not found or already inactive'
             });
         }
+
+        await RanchCompanyRouteModel.destroy({ where: { uuid_ranch } });
 
         return {
             success: true,

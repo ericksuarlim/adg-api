@@ -42,7 +42,7 @@ class ReferenceSampleService implements
         };
     }
 
-    async create(body: ReferenceSampleCreationAttributes): Promise<ServiceResponse<ReferenceSampleAttributes>> {
+    async create(body: ReferenceSampleCreationAttributes, _options?: unknown): Promise<ServiceResponse<ReferenceSampleAttributes>> {
         if (!body.title || body.title.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',

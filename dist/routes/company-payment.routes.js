@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const container_1 = require("../containers/container");
+const companyPaymentRoutes = (0, express_1.Router)({ mergeParams: true });
+companyPaymentRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_WRITE), container_1.container.companyPaymentController.createCompanyPayment);
+companyPaymentRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_READ), container_1.container.companyPaymentController.getCompanyPayments);
+companyPaymentRoutes.get('/:uuid_company_payment', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_READ), container_1.container.companyPaymentController.getCompanyPayment);
+companyPaymentRoutes.put('/:uuid_company_payment', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_WRITE), container_1.container.companyPaymentController.updateCompanyPayment);
+companyPaymentRoutes.delete('/:uuid_company_payment', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_WRITE), container_1.container.companyPaymentController.deleteCompanyPayment);
+exports.default = companyPaymentRoutes;

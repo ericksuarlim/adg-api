@@ -1,6 +1,9 @@
 # Stack API + Postgres. Run from this directory: `docker compose up`
 # Optional: copy `compose.env.example` to `compose.env` and run `docker compose --env-file compose.env up`
 # Defaults match project-wide ports (see compose.env.example).
+#
+# PostgreSQL: the API user (POSTGRES_USER) must be allowed to CREATE DATABASE for per-company tenant DBs.
+# The default `postgres` superuser always can; for a custom role use: ALTER ROLE your_user CREATEDB;
 
 name: adg-api
 
@@ -42,7 +45,8 @@ services:
       DB_NAME: ${ADG_DB_NAME:-adg-db-postgres}
       JWT_SECRET: ${ADG_JWT_SECRET:-local-super-secret-key}
       CORS_ORIGIN: "http://localhost:${ADG_UI_PORT:-4730}"
-      PLATFORM_ONBOARDING_KEY: ${ADG_PLATFORM_ONBOARDING_KEY:-local-onboarding-key}
+      TENANT_POOL_MAX: ${ADG_TENANT_POOL_MAX:-32}
+      DB_SYNC_ALTER: ${ADG_DB_SYNC_ALTER:-false}
       PORT: "3010"
     command: npm run dev:debug
     volumes:

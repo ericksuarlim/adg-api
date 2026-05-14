@@ -147,7 +147,7 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
         };
     }
 
-    async create(body: CompanyPaymentCreationAttributes): Promise<ServiceResponse<CompanyPaymentAttributes>> {
+    async create(body: CompanyPaymentCreationAttributes, _options?: unknown): Promise<ServiceResponse<CompanyPaymentAttributes>> {
         if (!body.uuid_company) {
             throw new ApiError({
                 name: 'ValidationError',

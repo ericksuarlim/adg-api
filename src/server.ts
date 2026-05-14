@@ -1,7 +1,7 @@
 import app from './app';
-import sequelize from './database';
+import saasSequelize from './database/saas-sequelize';
 import {envConfig} from "./config";
-import './database/models';
+import './database/saas-models.register';
 
 process.on('uncaughtException', (err) => {
     console.error('uncaughtException:', err);
@@ -10,10 +10,14 @@ process.on('unhandledRejection', (reason) => {
     console.error('unhandledRejection:', reason);
 });
 
-sequelize.authenticate()
+saasSequelize.authenticate()
     .then(() => {
-        console.log('Database connected');
-        return sequelize.sync({ alter: false });
+        console.log('SaaS database connected');
+        const syncAlter = envConfig.DB_SYNC_ALTER;
+        if (syncAlter) {
+            console.warn('SaaS DB sync: alter=true (DB_SYNC_ALTER); do not use in production without review.');
+        }
+        return saasSequelize.sync({ alter: syncAlter });
     })
     .then(() => {
         const port = Number(envConfig.PORT) || 3010;

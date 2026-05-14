@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const membershipRoutes = (0, express_1.Router)();
+membershipRoutes.post('/company-administrator', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_WRITE), container_1.container.membershipController.promoteCompanyAdministrator);
+membershipRoutes.get('/ranch/:uuid_ranch', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_READ), container_1.container.membershipController.getUsersByRanch);
+membershipRoutes.get('/user/:uuid_user', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_READ), container_1.container.membershipController.getRanchesByUser);
+membershipRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_WRITE), container_1.container.membershipController.assign);
+membershipRoutes.put('/:uuid_user', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_WRITE), container_1.container.membershipController.changeRole);
+membershipRoutes.delete('/:uuid_user', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.MEMBERSHIP_WRITE), container_1.container.membershipController.remove);
+exports.default = membershipRoutes;
