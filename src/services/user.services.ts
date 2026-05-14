@@ -11,6 +11,7 @@ import {IUserManagerServiceInterface} from "../interfaces/services/user-service.
 import {CompanyAttributes, CompanyCreationAttributes} from "../interfaces/company/company.interface";
 import {IPasswordValidatorService} from "../interfaces/services/password-validator-service.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
+import {UserFieldAvailabilityResult} from "../interfaces/user/user-availability.interface";
 
 class UserService implements
     IBaseServiceInterface<UserAttributes, UserCreationAttributes>,
@@ -34,13 +35,15 @@ class UserService implements
     }
 
     private getMaxUsersByPlan(planType: CompanyAttributes['plan_type']): number {
-        const limitsByPlan: Record<CompanyAttributes['plan_type'], number> = {
-            BASIC: 2,
-            PROFESSIONAL: 5,
-            PREMIUM: 10
+        const limitsByPlan: Record<string, number> = {
+            ESSENTIAL: 20,
+            PROFESSIONAL: 60,
+            ENTERPRISE: 200,
+            BASIC: 20,
+            PREMIUM: 200
         };
 
-        return limitsByPlan[planType] ?? 2;
+        return limitsByPlan[planType] ?? 20;
     }
 
     async getAll(params: IBaseParams): Promise<ServiceResponse<UserAttributes[]>> {
@@ -99,6 +102,13 @@ class UserService implements
 
         this.passwordValidatorService.validate(userBody.password);
 
+        await this.assertUniqueUserFields({
+                email: userBody.email,
+                username: userBody.username,
+                id_card: userBody.id_card,
+                uuid_company: userBody.uuid_company
+            });
+
         const hashedPassword = await bcrypt.hash(userBody.password, 10);
 
         const user = await this.userRepository.create({
@@ -152,7 +162,42 @@ class UserService implements
             });
         }
 
-        const updatedUser = await this.userRepository.update(uuid_user, userBody, tenantContext);
+        const existingResponse = await this.getById({
+            id: uuid_user,
+            includeInactive: false,
+            uuid_company: tenantContext?.uuid_company
+        });
+
+        if (!existingResponse.success || !existingResponse.data) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'User not found'
+            });
+        }
+
+        const existing = existingResponse.data;
+        const merged = {
+            email: userBody.email != null ? String(userBody.email) : existing.email,
+            username: userBody.username != null ? String(userBody.username) : existing.username,
+            id_card: userBody.id_card != null ? String(userBody.id_card) : existing.id_card,
+            uuid_company: userBody.uuid_company ?? existing.uuid_company
+        };
+
+        await this.assertUniqueUserFields(merged, uuid_user);
+
+        const updateData: UserCreationAttributes = { ...userBody };
+        if (updateData.password !== undefined && updateData.password !== null) {
+            const rawPassword = String(updateData.password).trim();
+            if (rawPassword === '') {
+                delete updateData.password;
+            } else {
+                this.passwordValidatorService.validate(rawPassword);
+                updateData.password = await bcrypt.hash(rawPassword, 10);
+            }
+        }
+
+        const updatedUser = await this.userRepository.update(uuid_user, updateData, tenantContext);
 
         if (!updatedUser) {
             throw new ApiError({
@@ -276,6 +321,86 @@ class UserService implements
         return {
             success: true,
             data: null,
+        }
+    }
+
+    async checkUserFieldAvailability(params: {
+        email?: string;
+        username?: string;
+        id_card?: string;
+        uuid_company: string;
+        exclude_uuid_user?: string;
+    }): Promise<ServiceResponse<UserFieldAvailabilityResult>> {
+        const email = params.email?.trim();
+        const username = params.username?.trim();
+        const idCard = params.id_card?.trim();
+
+        if (!email && !username && !idCard) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'At least one of email, username, or id_card is required'
+            });
+        }
+
+        if (idCard && !params.uuid_company) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_company is required when checking id_card'
+            });
+        }
+
+        const [emailHit, usernameHit, idCardHit] = await Promise.all([
+            email ? this.userManagerRepository.findConflictingEmail(email, params.exclude_uuid_user) : Promise.resolve(null),
+            username ? this.userManagerRepository.findConflictingUsername(username, params.exclude_uuid_user) : Promise.resolve(null),
+            idCard && params.uuid_company
+                ? this.userManagerRepository.findConflictingIdCard(idCard, params.uuid_company, params.exclude_uuid_user)
+                : Promise.resolve(null)
+        ]);
+
+        return {
+            success: true,
+            data: {
+                emailAvailable: email ? !emailHit : true,
+                usernameAvailable: username ? !usernameHit : true,
+                idCardAvailable: idCard ? !idCardHit : true
+            }
+        };
+    }
+
+    private async assertUniqueUserFields(
+        fields: { email: string; username: string; id_card: string; uuid_company: string },
+        excludeUuid?: string
+    ): Promise<void> {
+        const [emailHit, usernameHit, idCardHit] = await Promise.all([
+            this.userManagerRepository.findConflictingEmail(fields.email, excludeUuid),
+            this.userManagerRepository.findConflictingUsername(fields.username, excludeUuid),
+            this.userManagerRepository.findConflictingIdCard(fields.id_card, fields.uuid_company, excludeUuid)
+        ]);
+
+        if (emailHit) {
+            throw new ApiError({
+                name: 'Conflict',
+                statusCode: HttpStatusCodes.CONFLICT,
+                description: 'EMAIL_IN_USE'
+            });
+        }
+
+        if (usernameHit) {
+            throw new ApiError({
+                name: 'Conflict',
+                statusCode: HttpStatusCodes.CONFLICT,
+                description: 'USERNAME_IN_USE'
+            });
+        }
+
+        if (idCardHit) {
+            throw new ApiError({
+                name: 'Conflict',
+                statusCode: HttpStatusCodes.CONFLICT,
+                description: 'ID_CARD_IN_USE'
+            });
         }
     }
 }

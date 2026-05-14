@@ -8,6 +8,8 @@ export interface IBaseParams {
     order: Order;
     status?: Status;
     uuid_company?: string;
+    /** Limitar listados a ranchos concretos (alcance single_ranch). */
+    uuid_ranch_in?: string[];
 }
 
 export interface PaginationQuery {

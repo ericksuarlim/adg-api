@@ -5,6 +5,7 @@ import { Permission } from "../constants/authorization.constants";
 
 const userRoutes = Router();
 
+userRoutes.get('/availability', authorize(Permission.USER_READ), container.userController.checkUserFieldAvailability);
 userRoutes.post('/', authorize(Permission.USER_WRITE), container.userController.createUser);
 userRoutes.get('/:uuid_user', authorize(Permission.USER_READ), container.userController.getUser);
 userRoutes.get('/', authorize(Permission.USER_READ), container.userController.getUsers);

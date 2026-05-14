@@ -3,6 +3,7 @@ import { RanchModel, UserRanchModel } from "../database/models";
 import {UserRanchCreationAttributes} from "../interfaces/ranch/user-ranch.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
 import {normalizeUserRole, UserRole} from "../interfaces/roles/roles.interface";
+import { Op } from "sequelize";
 class MembershipRepository implements IMembershipRepository<UserRanchModel, UserRanchCreationAttributes> {
 
     async create(data: UserRanchCreationAttributes): Promise<UserRanchModel> {
@@ -121,6 +122,94 @@ class MembershipRepository implements IMembershipRepository<UserRanchModel, User
             )
         );
         return uniqueRoles;
+    }
+
+    async findActiveRanchIdsByUser(uuid_user: string, uuid_company: string): Promise<string[]> {
+        const rows = await UserRanchModel.findAll({
+            where: {
+                uuid_user,
+                is_active: true,
+            },
+            include: [
+                {
+                    model: RanchModel,
+                    as: "ranch",
+                    attributes: [],
+                    where: {
+                        uuid_company,
+                        is_active: true,
+                    },
+                    required: true,
+                },
+            ],
+        });
+        return rows.map((row) => row.uuid_ranch);
+    }
+
+    async countActiveMembershipsForUserInCompany(
+        uuid_user: string,
+        uuid_company: string,
+        excludeRanchId?: string
+    ): Promise<number> {
+        const where: Record<string, unknown> = {
+            uuid_user,
+            is_active: true,
+        };
+        if (excludeRanchId) {
+            where.uuid_ranch = { [Op.ne]: excludeRanchId };
+        }
+        return UserRanchModel.count({
+            where,
+            include: [
+                {
+                    model: RanchModel,
+                    as: "ranch",
+                    attributes: [],
+                    where: { uuid_company, is_active: true },
+                    required: true,
+                },
+            ],
+        });
+    }
+
+    async findUserIdsWithActiveAdministratorInCompany(uuid_company: string): Promise<string[]> {
+        const rows = await UserRanchModel.findAll({
+            attributes: ['uuid_user'],
+            where: {
+                is_active: true,
+                role: UserRole.ADMINISTRATOR,
+            },
+            include: [
+                {
+                    model: RanchModel,
+                    as: 'ranch',
+                    attributes: [],
+                    where: {
+                        uuid_company,
+                        is_active: true,
+                    },
+                    required: true,
+                },
+            ],
+        });
+        return [...new Set(rows.map((row) => row.uuid_user))];
+    }
+
+    async upsertActiveMembership(uuid_user: string, uuid_ranch: string, role: UserRole): Promise<UserRanchModel> {
+        const existing = await UserRanchModel.findOne({
+            where: { uuid_user, uuid_ranch },
+        });
+        if (!existing) {
+            return await UserRanchModel.create({
+                uuid_user,
+                uuid_ranch,
+                role,
+                is_active: true,
+            });
+        }
+        existing.set({ role, is_active: true });
+        await existing.save();
+        return existing;
     }
 }
 

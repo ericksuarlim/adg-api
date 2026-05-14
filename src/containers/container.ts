@@ -50,7 +50,7 @@ const passwordValidatorService = new PasswordValidatorService();
 const companyService = new CompanyService(companyRepository, companyPaymentRepository);
 const userService = new UserService(userRepository, userRepository, companyService, passwordValidatorService);
 const ranchService = new RanchService(ranchRepository);
-const animalService = new AnimalService(animalRepository);
+const animalService = new AnimalService(animalRepository, companyService);
 const animalWorkSessionService = new AnimalWorkSessionService(animalWorkSessionRepository);
 const sessionService = new SessionService(sessionRepository);
 const authenticationService = new AuthenticationService(
@@ -73,12 +73,14 @@ const companyPaymentService = new CompanyPaymentService(companyPaymentRepository
 const userController = new UserController(userService, userService);
 const companyController = new CompanyController(companyService, companyOnboardingService);
 const animalController = new AnimalController(animalService);
-const ranchController = new RanchController(ranchService);
+const ranchController = new RanchController(ranchService, membershipService);
 const animalWorkSessionController = new AnimalWorkSessionController(animalWorkSessionService);
 const authenticationController = new AuthenticationController(authenticationService);
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
 const companyPaymentController = new CompanyPaymentController(companyPaymentService);
+
+export { membershipRepository };
 
 export const container = {
     userController,

@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { ServiceResponse } from '../interfaces/common/service-response.interface';
 import { LoginData, ResetPasswordData, LogoutData } from '../interfaces/authentication/authentication-data.interface';
 import { IAuthenticationService } from '../interfaces/services/authentication-service.interface';
@@ -11,10 +12,11 @@ import HttpStatusCodes from "../errors/httpStatusCodes";
 import {envConfig} from "../config";
 import {IUserManagerServiceInterface} from "../interfaces/services/user-service.interface";
 import { UserRole } from "../interfaces/roles/roles.interface";
+import { computeAccessScope } from "../helpers/access-scope.helper";
 import { SESSION_EXPIRATION_TIME } from "../constants/auth.constants";
 import { IMembershipRepository } from "../interfaces/repositories/membership-repository.interface";
 import { CompanyModel, UserRanchModel } from "../database/models";
-import { UserRanchCreationAttributes } from "../interfaces/ranch/user-ranch.interface";
+import { normalizeLoginCredential } from '../utils/login-credential.util';
 
 class AuthenticationService implements IAuthenticationService {
     private readonly authenticationRepository: IAuthenticationDBRepository;
@@ -38,7 +40,9 @@ class AuthenticationService implements IAuthenticationService {
     async login(data: LoginData): Promise<ServiceResponse<any>> {
         const { user_name, password } = data;
 
-        if (!user_name || user_name.trim() === '') {
+        const login = normalizeLoginCredential(user_name);
+
+        if (!login) {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
@@ -46,17 +50,17 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
-        const userExists = await this.authenticationRepository.validateUser(user_name);
+        const userRow = await this.authenticationRepository.findActiveUserForLogin(login);
 
-        if (!userExists) {
+        if (!userRow) {
             throw new ApiError({
-                name: 'NotFound',
-                statusCode: HttpStatusCodes.NOT_FOUND,
+                name: 'Unauthorized',
+                statusCode: HttpStatusCodes.UNAUTHORIZED,
                 description: 'Wrong user'
             });
         }
 
-        const passwordValid = await this.authenticationRepository.validatePassword(password, user_name);
+        const passwordValid = await bcrypt.compare(password, userRow.password);
 
         if (!passwordValid) {
             throw new ApiError({
@@ -66,18 +70,14 @@ class AuthenticationService implements IAuthenticationService {
             });
         }
 
-        await this.sessionService.deactivateExpiredSessions(user_name);
-        await this.sessionService.logout(user_name);
+        const user = userRow.get({ plain: true }) as UserAttributes;
 
-        const userResponse = await this.userManagerService.getUserByName(user_name);
-        const user = userResponse.data;
-
-        if (!userResponse.success || !user) {
-            throw new ApiError({
-                name: 'NotFound',
-                statusCode: HttpStatusCodes.NOT_FOUND,
-                description: 'User not found'
-            });
+        const sessionIdentifiers = new Set(
+            [login, user.username, user.email].map((s) => s?.trim()).filter((s): s is string => Boolean(s))
+        );
+        for (const id of sessionIdentifiers) {
+            await this.sessionService.deactivateExpiredSessions(id);
+            await this.sessionService.logout(id);
         }
         const membershipRoles = await this.membershipRepository.findActiveRolesByUser(
             user.uuid_user,
@@ -85,7 +85,32 @@ class AuthenticationService implements IAuthenticationService {
         );
         const roles = membershipRoles.length > 0
             ? membershipRoles
-            : [UserRole.USER];
+            : [UserRole.RANCH_STAFF];
+
+        const ranchIds = await this.membershipRepository.findActiveRanchIdsByUser(
+            user.uuid_user,
+            user.uuid_company
+        );
+        const access_scope = computeAccessScope(roles);
+        if (access_scope === "single_ranch") {
+            if (ranchIds.length === 0) {
+                throw new ApiError({
+                    name: "BadRequest",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description:
+                        "No active ranch membership for this company. Ask an administrator to assign this user to a ranch, or assign a company administrator role.",
+                });
+            }
+            if (ranchIds.length !== 1) {
+                throw new ApiError({
+                    name: "BadRequest",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description:
+                        "Ranch staff must have exactly one active ranch in this company. Administrator may have multiple ranches.",
+                });
+            }
+        }
+        const ranch_uuids = access_scope === "saas_global" ? [] : ranchIds;
 
         const company = await CompanyModel.findOne({
             where: {
@@ -94,23 +119,41 @@ class AuthenticationService implements IAuthenticationService {
             }
         });
 
+        const secret = envConfig.JWT_SECRET?.trim();
+        if (!secret) {
+            throw new ApiError({
+                name: 'InternalError',
+                statusCode: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+                description: 'JWT_SECRET is not configured',
+            });
+        }
+
+        const membershipRenewalIso = (): string | undefined => {
+            const raw = company?.membership_renewal_at;
+            if (raw == null) {
+                return undefined;
+            }
+            const dt = raw instanceof Date ? raw : new Date(raw as string | number);
+            return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
+        };
+
         const token = jwt.sign(
             {
                 sub: user.uuid_user,
                 username: user.username,
                 uuid_company: user.uuid_company,
                 roles,
+                access_scope,
+                ranch_uuids,
                 membership_status: company?.membership_status,
-                membership_renewal_at: company?.membership_renewal_at
-                    ? company.membership_renewal_at.toISOString()
-                    : undefined,
+                membership_renewal_at: membershipRenewalIso(),
             },
-            envConfig.JWT_SECRET,
+            secret,
             { expiresIn: this.SESSION_EXPIRATION_TIME }
         );
 
         const session: SessionCreationAttributes = {
-            user_name,
+            user_name: user.username,
             user_token: token,
             is_active: true,
             login_date: new Date(),
@@ -130,7 +173,7 @@ class AuthenticationService implements IAuthenticationService {
             success: true,
             data: {
                 session: sessionResponse.data,
-                user: userResponse.data,
+                user,
                 token,
             },
         };

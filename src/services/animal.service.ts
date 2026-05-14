@@ -1,21 +1,25 @@
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import { AnimalAttributes, AnimalCreationAttributes } from "../interfaces/animal/animal.interface";
 import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
-import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
-import AnimalModel from "../database/models/animal.model";
 import { IBaseParams } from "../interfaces/params/query.interface";
 import RanchModel from "../database/models/ranch.model";
+import AnimalRepository from "../repositories/animal.repository";
+import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
+import { normalizeCompanyPlanType, PLAN_HEAD_LIMIT } from "../constants/subscription.constants";
 
 class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes> {
 
-    private readonly animalRepository: IBaseRepository<AnimalModel, AnimalCreationAttributes>;
+    private readonly animalRepository: AnimalRepository;
+    private readonly companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
 
     constructor(
-        animalRepository: IBaseRepository<AnimalModel, AnimalCreationAttributes>
+        animalRepository: AnimalRepository,
+        companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>
     ) {
         this.animalRepository = animalRepository;
+        this.companyService = companyService;
     }
 
     private async validateRanchBelongsToCompany(
@@ -64,13 +68,48 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
     }
 
     async create(animalBody: AnimalCreationAttributes): Promise<ServiceResponse<AnimalAttributes>> {
-        await this.validateRanchBelongsToCompany(animalBody.ranch_uuid);
+        const uuidCompany = animalBody.uuid_company;
+        if (!uuidCompany || uuidCompany.trim() === '') {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'uuid_company is required to create an animal'
+            });
+        }
+
+        await this.validateRanchBelongsToCompany(animalBody.ranch_uuid, { uuid_company: uuidCompany });
+
+        const companyResponse = await this.companyService.getById({ id: uuidCompany, includeInactive: true });
+        if (!companyResponse.success || !companyResponse.data) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company not found'
+            });
+        }
+
+        const plan = normalizeCompanyPlanType(companyResponse.data.plan_type);
+        const headLimit = PLAN_HEAD_LIMIT[plan];
+        const currentHeads = await this.animalRepository.countActiveByCompany(uuidCompany);
+        if (currentHeads >= headLimit) {
+            throw new ApiError({
+                name: 'PlanAnimalHeadLimitReached',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Animal head limit reached for this company (${headLimit} heads for plan ${plan})`
+            });
+        }
+
         const animal = await this.animalRepository.create(animalBody);
         return { success: true, data: animal.get({ plain: true }) };
     }
 
-    async getById(params: { id: string; includeInactive?: boolean; uuid_company?: string }): Promise<ServiceResponse<AnimalAttributes>> {
-        const { id, includeInactive, uuid_company } = params;
+    async getById(params: {
+        id: string;
+        includeInactive?: boolean;
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
+    }): Promise<ServiceResponse<AnimalAttributes>> {
+        const { id, includeInactive, uuid_company, uuid_ranch_in } = params;
         if (!id || id.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
@@ -79,7 +118,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        const animal = await this.animalRepository.findById({ id, includeInactive, uuid_company });
+        const animal = await this.animalRepository.findById({ id, includeInactive, uuid_company, uuid_ranch_in });
         if (!animal) {
             throw new ApiError({
                 name: 'NotFound',
@@ -94,7 +133,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
     async update(
         id: string,
         animalBody: AnimalCreationAttributes,
-        tenantContext?: { uuid_company?: string }
+        tenantContext?: { uuid_company?: string; uuid_ranch_in?: string[] }
     ): Promise<ServiceResponse<AnimalAttributes>> {
         if (!id || id.trim() === '') {
             throw new ApiError({
@@ -104,7 +143,12 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        const current = await this.animalRepository.findById({ id, includeInactive: false });
+        const current = await this.animalRepository.findById({
+            id,
+            includeInactive: false,
+            uuid_company: tenantContext?.uuid_company,
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        });
         if (!current) {
             throw new ApiError({
                 name: 'NotFound',
@@ -113,10 +157,15 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        await this.validateRanchBelongsToCompany(current.ranch_uuid, tenantContext);
-        await this.validateRanchBelongsToCompany(animalBody.ranch_uuid ?? current.ranch_uuid, tenantContext);
+        const effectiveTenant = {
+            uuid_company: tenantContext?.uuid_company ?? (current.get("uuid_company") as string),
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        };
 
-        const updated = await this.animalRepository.update(id, animalBody, tenantContext);
+        await this.validateRanchBelongsToCompany(current.ranch_uuid, effectiveTenant);
+        await this.validateRanchBelongsToCompany(animalBody.ranch_uuid ?? current.ranch_uuid, effectiveTenant);
+
+        const updated = await this.animalRepository.update(id, animalBody);
         if (!updated) {
             throw new ApiError({
                 name: 'NotFound',
@@ -128,7 +177,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         return { success: true, data: updated.get({ plain: true }) };
     }
 
-    async delete(id: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
+    async delete(id: string, tenantContext?: { uuid_company?: string; uuid_ranch_in?: string[] }): Promise<ServiceResponse<null>> {
         if (!id || id.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',

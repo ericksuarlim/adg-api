@@ -2,7 +2,8 @@ import {UserCreationAttributes} from "../interfaces/user/user.interface";
 import {IUserManagerRepository} from "../interfaces/repositories/user-repository.interface";
 import { CompanyModel, UserModel } from "../database/models";
 import {IBaseRepository} from "../interfaces/repositories/base-repository.interface";
-import { Op } from "sequelize";
+import { normalizeLoginCredential } from "../utils/login-credential.util";
+import { Op, fn, col, where } from "sequelize";
 
 class UserRepository implements
     IBaseRepository<UserModel, UserCreationAttributes>,
@@ -111,10 +112,20 @@ class UserRepository implements
     }
 
     async findUserByName(username: string): Promise<UserModel | null>  {
+        const trimmed = normalizeLoginCredential(username);
+        if (!trimmed) {
+            return null;
+        }
+        const lowered = trimmed.toLowerCase();
         const user = await UserModel.findOne({
             where: {
-                [Op.or]: [{ username }, { email: username }],
-                is_active: true
+                is_active: true,
+                [Op.or]: [
+                    { username: trimmed },
+                    { email: trimmed },
+                    where(fn("LOWER", fn("TRIM", col("username"))), Op.eq, lowered),
+                    where(fn("LOWER", fn("TRIM", col("email"))), Op.eq, lowered),
+                ],
             }
         });
 
@@ -133,6 +144,52 @@ class UserRepository implements
         );
 
         return affectedRows > 0;
+    }
+
+    async findConflictingEmail(email: string, excludeUuid?: string): Promise<UserModel | null> {
+        const trimmed = email.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const where: Record<string, unknown> = { email: trimmed };
+        if (excludeUuid) {
+            where.uuid_user = { [Op.ne]: excludeUuid };
+        }
+
+        return await UserModel.findOne({ where });
+    }
+
+    async findConflictingUsername(username: string, excludeUuid?: string): Promise<UserModel | null> {
+        const trimmed = username.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const where: Record<string, unknown> = { username: trimmed };
+        if (excludeUuid) {
+            where.uuid_user = { [Op.ne]: excludeUuid };
+        }
+
+        return await UserModel.findOne({ where });
+    }
+
+    async findConflictingIdCard(idCard: string, uuidCompany: string, excludeUuid?: string): Promise<UserModel | null> {
+        const trimmed = idCard.trim();
+        if (!trimmed || !uuidCompany) {
+            return null;
+        }
+
+        const where: Record<string, unknown> = {
+            id_card: trimmed,
+            uuid_company: uuidCompany,
+            is_active: true
+        };
+        if (excludeUuid) {
+            where.uuid_user = { [Op.ne]: excludeUuid };
+        }
+
+        return await UserModel.findOne({ where });
     }
 }
 

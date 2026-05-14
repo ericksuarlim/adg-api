@@ -7,27 +7,27 @@ const companyPaymentRoutes = Router({ mergeParams: true });
 
 companyPaymentRoutes.post(
     '/',
-    authorize(Permission.COMPANY_WRITE),
+    authorize(Permission.COMPANY_TENANT_WRITE),
     container.companyPaymentController.createCompanyPayment
 );
 companyPaymentRoutes.get(
     '/',
-    authorize(Permission.COMPANY_READ),
+    authorize(Permission.COMPANY_TENANT_READ),
     container.companyPaymentController.getCompanyPayments
 );
 companyPaymentRoutes.get(
     '/:uuid_company_payment',
-    authorize(Permission.COMPANY_READ),
+    authorize(Permission.COMPANY_TENANT_READ),
     container.companyPaymentController.getCompanyPayment
 );
 companyPaymentRoutes.put(
     '/:uuid_company_payment',
-    authorize(Permission.COMPANY_WRITE),
+    authorize(Permission.COMPANY_TENANT_WRITE),
     container.companyPaymentController.updateCompanyPayment
 );
 companyPaymentRoutes.delete(
     '/:uuid_company_payment',
-    authorize(Permission.COMPANY_WRITE),
+    authorize(Permission.COMPANY_TENANT_WRITE),
     container.companyPaymentController.deleteCompanyPayment
 );
 

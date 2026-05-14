@@ -13,6 +13,8 @@ import { buildGetAllParams, buildGetByIdParams } from '../utils/query.builder';
 import { IBaseParams, IncludeInactiveQuery } from '../interfaces/params/query.interface';
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 import { UserRole } from "../interfaces/roles/roles.interface";
+import ApiError from "../errors/apiError";
+import HttpStatusCodes from "../errors/httpStatusCodes";
 
 class UserController {
     private readonly userService: IBaseServiceInterface<UserAttributes, UserCreationAttributes>;
@@ -82,6 +84,44 @@ class UserController {
         }
     }
 
+    checkUserFieldAvailability = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const requestedCompany = typeof req.query.uuid_company === 'string'
+                ? req.query.uuid_company
+                : undefined;
+            const uuid_company = this.isSaasOwner(req) && requestedCompany
+                ? requestedCompany
+                : (req.user?.uuid_company as string | undefined);
+
+            if (!uuid_company) {
+                throw new ApiError({
+                    name: 'ValidationError',
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: 'Company context is required'
+                });
+            }
+
+            const email = typeof req.query.email === 'string' ? req.query.email : undefined;
+            const username = typeof req.query.username === 'string' ? req.query.username : undefined;
+            const id_card = typeof req.query.id_card === 'string' ? req.query.id_card : undefined;
+            const exclude_uuid_user = typeof req.query.exclude_uuid_user === 'string'
+                ? req.query.exclude_uuid_user
+                : undefined;
+
+            const response = await this.userManagerService.checkUserFieldAvailability({
+                email,
+                username,
+                id_card,
+                uuid_company,
+                exclude_uuid_user
+            });
+
+            return handleResponse(res, response, 200);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     updateUser = async (req: AuthRequest & Request<IUpdateUserParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_user } = req.params;
@@ -89,6 +129,7 @@ class UserController {
             const tenantScope = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             if (!this.isSaasOwner(req)) {
                 userBody.uuid_company = req.user?.uuid_company as string;
+                delete (userBody as { password?: string }).password;
             }
             const response = await this.userService.update(uuid_user, userBody, { uuid_company: tenantScope });
 

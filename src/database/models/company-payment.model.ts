@@ -73,12 +73,12 @@ CompanyPaymentModel.init(
         plan_type: {
             type: DataTypes.ENUM(...COMPANY_PLAN_TYPES),
             allowNull: false,
-            defaultValue: 'BASIC',
+            defaultValue: 'ESSENTIAL',
         },
         billing_cycle: {
             type: DataTypes.ENUM(...BILLING_CYCLES),
             allowNull: false,
-            defaultValue: 'MONTHLY',
+            defaultValue: 'ANNUAL',
         },
         status: {
             type: DataTypes.ENUM(...PAYMENT_STATUSES),

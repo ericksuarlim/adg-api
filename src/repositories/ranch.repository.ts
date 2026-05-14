@@ -1,6 +1,7 @@
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import { RanchModel } from "../database/models";
 import { RanchCreationAttributes } from "../interfaces/ranch/ranch.interface";
+import { Op } from "sequelize";
 
 class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttributes> {
 
@@ -10,6 +11,8 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         sortBy: string;
         order: 'ASC' | 'DESC';
         status?: 'all' | 'active' | 'inactive';
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
     }): Promise<{rows: RanchModel[], count: number}> {
 
         const { page, size, sortBy, order, status } = params;
@@ -27,6 +30,9 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         if (params.uuid_company) {
             where.uuid_company = params.uuid_company;
         }
+        if (params.uuid_ranch_in?.length) {
+            where.uuid_ranch = { [Op.in]: params.uuid_ranch_in };
+        }
 
         return await RanchModel.findAndCountAll({
             where,
@@ -36,8 +42,17 @@ class RanchRepository implements IBaseRepository<RanchModel, RanchCreationAttrib
         });
     }
 
-    async findById(params: { id: string; includeInactive?: boolean, uuid_company?: string }): Promise<RanchModel | null> {
-        const { id: uuid_ranch, includeInactive, uuid_company } = params;
+    async findById(params: {
+        id: string;
+        includeInactive?: boolean;
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
+    }): Promise<RanchModel | null> {
+        const { id: uuid_ranch, includeInactive, uuid_company, uuid_ranch_in } = params;
+
+        if (uuid_ranch_in?.length && !uuid_ranch_in.includes(uuid_ranch)) {
+            return null;
+        }
 
         const where: any = { uuid_ranch };
 

@@ -13,6 +13,7 @@ import { CompanyOnboardingData } from "../interfaces/company/company-onboarding.
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 import { UserRole } from "../interfaces/roles/roles.interface";
 import CompanyService from "../services/company.service";
+import { assertTenantCompany } from "../helpers/access-scope.helper";
 
 class CompanyController {
     private readonly companyService: CompanyService;
@@ -60,6 +61,8 @@ class CompanyController {
             const { uuid_company } = req.params;
             const { includeInactive } = buildGetByIdParams(req.query);
 
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.getById({
                 id: uuid_company,
@@ -91,6 +94,8 @@ class CompanyController {
             const { uuid_company } = req.params;
             const reqBody = req.body as CompanyCreationAttributes;
 
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.update(
                 uuid_company,
@@ -107,6 +112,9 @@ class CompanyController {
     deleteCompany = async (req: AuthRequest & Request<IDeleteCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
+
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.delete(uuid_company, { uuid_company: tenantCompany });
 
@@ -119,6 +127,9 @@ class CompanyController {
     endCompanySubscription = async (req: AuthRequest & Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
+
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.endSubscription(uuid_company, { uuid_company: tenantCompany });
 
@@ -131,6 +142,9 @@ class CompanyController {
     reactivateCompany = async (req: AuthRequest & Request<IUpdateCompanyParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_company } = req.params;
+
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.reactivate(uuid_company, { uuid_company: tenantCompany });
 
@@ -148,6 +162,9 @@ class CompanyController {
         try {
             const { uuid_company } = req.params;
             const { trial_start_date, trial_end_date } = req.body as { trial_start_date: string; trial_end_date: string };
+
+            assertTenantCompany(req.user, uuid_company);
+
             const tenantCompany = this.isSaasOwner(req) ? undefined : req.user?.uuid_company;
             const response = await this.companyService.activateTrial(
                 uuid_company,

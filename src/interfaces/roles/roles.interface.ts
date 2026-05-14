@@ -1,24 +1,30 @@
 export enum UserRole {
     SAAS_OWNER = 'saas_owner',
     ADMINISTRATOR = 'administrator',
-    SUPERVISOR = 'supervisor',
-    HEALTHCARE_STAFF = 'healthcare_staff',
-    USER = 'user',
+    RANCH_STAFF = 'ranch_staff',
 }
 
-const LEGACY_ROLE_MAP: Record<string, UserRole> = {
-    SUPER_ADMIN: UserRole.SAAS_OWNER,
-    ADMIN: UserRole.ADMINISTRATOR,
-    USER: UserRole.USER,
-};
+const CANONICAL_ROLE_STRINGS = Object.values(UserRole) as string[];
 
+/** Acepta solo los tres roles canónicos (comparación exacta o en minúsculas). */
 export const normalizeUserRole = (role: string): UserRole | null => {
-    if (Object.values(UserRole).includes(role as UserRole)) {
-        return role as UserRole;
+    const trimmed = typeof role === 'string' ? role.trim() : '';
+    if (!trimmed) {
+        return null;
     }
-
-    return LEGACY_ROLE_MAP[role] ?? null;
+    if (CANONICAL_ROLE_STRINGS.includes(trimmed)) {
+        return trimmed as UserRole;
+    }
+    const lower = trimmed.toLowerCase();
+    if (CANONICAL_ROLE_STRINGS.includes(lower)) {
+        return lower as UserRole;
+    }
+    return null;
 };
+
+/** Roles asignables en membresía rancho–usuario (no incluye SaaS owner). */
+export const isValidAssignableRole = (role: string): role is UserRole =>
+    role === UserRole.ADMINISTRATOR || role === UserRole.RANCH_STAFF;
 
 export const normalizeUserRoles = (roles: string[]): UserRole[] => {
     const normalized = roles

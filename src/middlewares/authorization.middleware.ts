@@ -3,10 +3,11 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 import { Permission, PERMISSION_ROLE_MAP } from "../constants/authorization.constants";
+import { normalizeUserRoles } from "../interfaces/roles/roles.interface";
 
 export const authorize = (permission: Permission) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
-        const roles = req.user?.roles ?? [];
+        const roles = normalizeUserRoles(req.user?.roles ?? []);
         const allowedRoles = PERMISSION_ROLE_MAP[permission];
 
         const hasPermission = roles.some((role) => allowedRoles.includes(role));

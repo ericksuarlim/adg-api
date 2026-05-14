@@ -327,7 +327,7 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         await this.companyPaymentRepository.create({
             uuid_company,
             amount: 0,
-            currency: 'BOB',
+            currency: 'USD',
             payment_method: null,
             paid_at: startDate,
             period_start: startDate,
@@ -382,8 +382,8 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             return null;
         }
 
-        if (billingCycle === 'MONTHLY') {
-            renewalDate.setMonth(renewalDate.getMonth() + 1);
+        if (billingCycle === 'SEMESTRAL') {
+            renewalDate.setMonth(renewalDate.getMonth() + 6);
         }
 
         if (billingCycle === 'ANNUAL') {

@@ -1,37 +1,58 @@
+# Stack API + Postgres. Run from this directory: `docker compose up`
+# Optional: copy `compose.env.example` to `compose.env` and run `docker compose --env-file compose.env up`
+# Defaults match project-wide ports (see compose.env.example).
+
+name: adg-api
+
 services:
-  adg-api-services:
-    build: .
+  postgres:
+    image: postgres:15
+    container_name: adg-api-postgres
+    restart: unless-stopped
     ports:
-      - "3010:3010"
-      - "9230:9230"
+      - "${ADG_DB_HOST_PORT:-15432}:5432"
+    environment:
+      POSTGRES_DB: ${ADG_DB_NAME:-adg-db-postgres}
+      POSTGRES_USER: ${ADG_DB_USER:-adg-user-postgres}
+      POSTGRES_PASSWORD: ${ADG_DB_PASSWORD:-postgres}
+    volumes:
+      # Named volume `adg-api_pgdata` (same as the previous stack) keeps existing DB files.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ADG_DB_USER:-adg-user-postgres} -d ${ADG_DB_NAME:-adg-db-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adg-api
+    restart: unless-stopped
+    ports:
+      - "${ADG_API_PORT:-3010}:3010"
+      - "${ADG_NODE_DEBUG_PORT:-9230}:9230"
     environment:
       NODE_ENV: development
-      DB_HOST: adg-db-postgres-services
-      DB_PORT: 5432
-      DB_USER: adg-user-postgres
-      DB_PASSWORD: postgres
-      DB_NAME: adg-db-postgres
-      JWT_SECRET: local-super-secret-key
-      CORS_ORIGIN: http://localhost:4200
-      PLATFORM_ONBOARDING_KEY: local-onboarding-key
-      PORT: 3010
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${ADG_DB_USER:-adg-user-postgres}
+      DB_PASSWORD: ${ADG_DB_PASSWORD:-postgres}
+      DB_NAME: ${ADG_DB_NAME:-adg-db-postgres}
+      JWT_SECRET: ${ADG_JWT_SECRET:-local-super-secret-key}
+      CORS_ORIGIN: "http://localhost:${ADG_UI_PORT:-4730}"
+      PLATFORM_ONBOARDING_KEY: ${ADG_PLATFORM_ONBOARDING_KEY:-local-onboarding-key}
+      PORT: "3010"
     command: npm run dev:debug
     volumes:
       - .:/app
-      - /app/node_modules
+      - adg_api_node_modules:/app/node_modules
     depends_on:
-      - adg-db-postgres-services
-
-  adg-db-postgres-services:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: adg-db-postgres
-      POSTGRES_USER: adg-user-postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      postgres:
+        condition: service_healthy
 
 volumes:
-  pgdata:
+  postgres_data:
+    name: adg-api_pgdata
+  adg_api_node_modules:

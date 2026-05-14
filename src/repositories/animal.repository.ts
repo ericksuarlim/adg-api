@@ -3,6 +3,7 @@ import { IBaseRepository } from "../interfaces/repositories/base-repository.inte
 import AnimalModel from "../database/models/animal.model";
 import { Status } from "../interfaces/params/query.interface";
 import RanchModel from "../database/models/ranch.model";
+import { Op } from "sequelize";
 
 class AnimalRepository implements
     IBaseRepository<AnimalModel, AnimalCreationAttributes> {
@@ -15,6 +16,7 @@ class AnimalRepository implements
             order: 'ASC' | 'DESC';
             status?: Status;
             uuid_company?: string;
+            uuid_ranch_in?: string[];
         }
     ): Promise<{ rows: AnimalModel[]; count: number }> {
         const { page, size, sortBy, order, status } = params;
@@ -27,11 +29,20 @@ class AnimalRepository implements
             where.is_active = false;
         }
 
-        const include = params.uuid_company ? [{
+        const needsRanchJoin = Boolean(params.uuid_company) || Boolean(params.uuid_ranch_in?.length);
+        const ranchWhere: Record<string, unknown> = { is_active: true };
+        if (params.uuid_company) {
+            ranchWhere.uuid_company = params.uuid_company;
+        }
+        if (params.uuid_ranch_in?.length) {
+            ranchWhere.uuid_ranch = { [Op.in]: params.uuid_ranch_in };
+        }
+
+        const include = needsRanchJoin ? [{
             model: RanchModel,
             as: 'ranch',
             required: true,
-            where: { uuid_company: params.uuid_company, is_active: true }
+            where: ranchWhere
         }] : [];
 
         return await AnimalModel.findAndCountAll({
@@ -44,19 +55,28 @@ class AnimalRepository implements
     }
 
     async findById(
-        params: { id: string; includeInactive?: boolean; uuid_company?: string }
+        params: { id: string; includeInactive?: boolean; uuid_company?: string; uuid_ranch_in?: string[] }
     ): Promise<AnimalModel | null> {
-        const { id, includeInactive, uuid_company } = params;
+        const { id, includeInactive, uuid_company, uuid_ranch_in } = params;
         const where: any = { animal_uuid: id };
         if (!includeInactive) {
             where.is_active = true;
         }
 
-        const include = uuid_company ? [{
+        const needsRanchJoin = Boolean(uuid_company) || Boolean(uuid_ranch_in?.length);
+        const ranchWhere: Record<string, unknown> = { is_active: true };
+        if (uuid_company) {
+            ranchWhere.uuid_company = uuid_company;
+        }
+        if (uuid_ranch_in?.length) {
+            ranchWhere.uuid_ranch = { [Op.in]: uuid_ranch_in };
+        }
+
+        const include = needsRanchJoin ? [{
             model: RanchModel,
             as: 'ranch',
             required: true,
-            where: { uuid_company, is_active: true }
+            where: ranchWhere
         }] : [];
 
         return await AnimalModel.findOne({ where, include });
@@ -79,15 +99,24 @@ class AnimalRepository implements
         return updated[0];
     }
 
-    async delete(animal_uuid: string, options?: { uuid_company?: string }): Promise<boolean> {
+    async delete(animal_uuid: string, options?: { uuid_company?: string; uuid_ranch_in?: string[] }): Promise<boolean> {
         let canDelete = true;
-        if (options?.uuid_company) {
+        if (options?.uuid_company || options?.uuid_ranch_in?.length) {
             const current = await AnimalModel.findOne({ where: { animal_uuid, is_active: true } });
             if (current) {
-                const ranch = await RanchModel.findOne({
-                    where: { uuid_ranch: current.ranch_uuid, uuid_company: options.uuid_company, is_active: true }
-                });
-                canDelete = Boolean(ranch);
+                if (options.uuid_ranch_in?.length && !options.uuid_ranch_in.includes(current.ranch_uuid)) {
+                    canDelete = false;
+                } else {
+                    const ranchWhere: Record<string, unknown> = {
+                        uuid_ranch: current.ranch_uuid,
+                        is_active: true,
+                    };
+                    if (options.uuid_company) {
+                        ranchWhere.uuid_company = options.uuid_company;
+                    }
+                    const ranch = await RanchModel.findOne({ where: ranchWhere });
+                    canDelete = Boolean(ranch);
+                }
             } else {
                 canDelete = false;
             }
@@ -98,6 +127,12 @@ class AnimalRepository implements
 
         const [count] = await AnimalModel.update({ is_active: false }, { where: { animal_uuid, is_active: true } });
         return count > 0;
+    }
+
+    async countActiveByCompany(uuid_company: string): Promise<number> {
+        return AnimalModel.count({
+            where: { uuid_company, is_active: true }
+        });
     }
 }
 

@@ -9,10 +9,20 @@ export const mapErrorHelper = (err: any): ApiError => {
     }
 
     if (err instanceof UniqueConstraintError) {
+        const path = err.errors?.[0]?.path as string | undefined;
+        const duplicateCode =
+            path === 'email'
+                ? 'EMAIL_IN_USE'
+                : path === 'username'
+                    ? 'USERNAME_IN_USE'
+                    : path === 'id_card'
+                        ? 'ID_CARD_IN_USE'
+                        : 'DUPLICATE_VALUE';
+
         return new ApiError({
             name: 'ConflictError',
             statusCode: HttpStatusCodes.CONFLICT,
-            description: err.errors?.[0]?.message || 'Duplicate value'
+            description: duplicateCode
         });
     }
 

@@ -20,6 +20,9 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         sortBy: string;
         order: 'ASC' | 'DESC';
         is_active?: boolean;
+        status?: 'all' | 'active' | 'inactive';
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
     }): Promise<ServiceResponse<RanchAttributes[]>> {
 
         const {rows, count} = await this.ranchRepository.findAll(params);
@@ -48,8 +51,13 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         };
     }
 
-    async getById(params: { id: string; includeInactive?: boolean; uuid_company?: string }): Promise<ServiceResponse<RanchAttributes>> {
-        const { id: uuid_ranch, includeInactive, uuid_company } = params;
+    async getById(params: {
+        id: string;
+        includeInactive?: boolean;
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
+    }): Promise<ServiceResponse<RanchAttributes>> {
+        const { id: uuid_ranch, includeInactive, uuid_company, uuid_ranch_in } = params;
 
         if (!uuid_ranch || uuid_ranch.trim() === '') {
             throw new ApiError({
@@ -59,7 +67,7 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             });
         }
 
-        const ranch = await this.ranchRepository.findById({ id: uuid_ranch, includeInactive, uuid_company });
+        const ranch = await this.ranchRepository.findById({ id: uuid_ranch, includeInactive, uuid_company, uuid_ranch_in });
 
         if (!ranch) {
             throw new ApiError({

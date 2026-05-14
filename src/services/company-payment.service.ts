@@ -12,7 +12,7 @@ import HttpStatusCodes from "../errors/httpStatusCodes";
 import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
 import { CompanyModel } from "../database/models";
 import { BillingCycle, BILLING_CYCLES, COMPANY_PLAN_TYPES, PAYMENT_METHODS } from "../constants/domain.constants";
-import { ANNUAL_DISCOUNT_PERCENT, PLAN_PRICES_BS } from "../constants/subscription.constants";
+import { getSubscriptionChargeUsd } from "../constants/subscription.constants";
 
 class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttributes, CompanyPaymentCreationAttributes> {
     private readonly companyPaymentRepository: IBaseRepository<CompanyPaymentModel, CompanyPaymentCreationAttributes>;
@@ -31,19 +31,13 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
         if (billingCycle === 'ANNUAL') {
             renewalDate.setFullYear(renewalDate.getFullYear() + 1);
         } else {
-            renewalDate.setMonth(renewalDate.getMonth() + 1);
+            renewalDate.setMonth(renewalDate.getMonth() + 6);
         }
         return renewalDate;
     }
 
     private calculateActivationAmount(planType: CompanyPaymentAttributes['plan_type'], billingCycle: BillingCycle): number {
-        const monthlyPrice = PLAN_PRICES_BS[planType];
-        if (billingCycle === 'ANNUAL') {
-            const annualBase = monthlyPrice * 12;
-            const discountedAnnual = annualBase * (1 - ANNUAL_DISCOUNT_PERCENT / 100);
-            return Number(discountedAnnual.toFixed(2));
-        }
-        return monthlyPrice;
+        return getSubscriptionChargeUsd(planType, billingCycle);
     }
 
     private parseDateField(rawDate: unknown, fieldName: string): Date {
@@ -181,7 +175,7 @@ class CompanyPaymentService implements IBaseServiceInterface<CompanyPaymentAttri
         const payload: CompanyPaymentCreationAttributes = {
             ...body,
             amount: normalized.amount,
-            currency: 'BOB',
+            currency: 'USD',
             paid_at: normalized.paidAt,
             period_start: normalized.periodStart,
             payment_reference: normalized.paymentReference,
