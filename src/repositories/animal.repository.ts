@@ -1,4 +1,5 @@
 import { AnimalCreationAttributes } from "../interfaces/animal/animal.interface";
+import { AnimalSex } from "../interfaces/animal/animal.interface";
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import AnimalModel from "../database/models/animal.model";
 import { Status } from "../interfaces/params/query.interface";
@@ -22,7 +23,7 @@ class AnimalRepository implements
         const { page, size, sortBy, order, status } = params;
         const offset = (page - 1) * size;
 
-        const where: any = {};
+        const where: Record<string, unknown> = {};
         if (status === 'active') {
             where.is_active = true;
         } else if (status === 'inactive') {
@@ -58,7 +59,7 @@ class AnimalRepository implements
         params: { id: string; includeInactive?: boolean; uuid_company?: string; uuid_ranch_in?: string[] }
     ): Promise<AnimalModel | null> {
         const { id, includeInactive, uuid_company, uuid_ranch_in } = params;
-        const where: any = { animal_uuid: id };
+        const where: Record<string, unknown> = { animal_uuid: id };
         if (!includeInactive) {
             where.is_active = true;
         }
@@ -131,8 +132,69 @@ class AnimalRepository implements
 
     async countActiveByCompany(uuid_company: string): Promise<number> {
         return AnimalModel.count({
-            where: { uuid_company, is_active: true }
+            where: { is_active: true },
+            distinct: true,
+            col: 'animal_uuid',
+            include: [{
+                model: RanchModel,
+                as: 'ranch',
+                required: true,
+                attributes: [],
+                where: { uuid_company, is_active: true },
+            }],
         });
+    }
+
+    async findAnimalUuidByRanchAndRegistration(
+        ranch_uuid: string,
+        registration_number: string,
+        options?: { excludeAnimalUuid?: string }
+    ): Promise<string | null> {
+        const where: Record<string, unknown> = {
+            ranch_uuid,
+            registration_number: registration_number.trim(),
+            is_active: true,
+        };
+        if (options?.excludeAnimalUuid) {
+            where.animal_uuid = { [Op.ne]: options.excludeAnimalUuid };
+        }
+        const found = await AnimalModel.findOne({
+            where,
+            attributes: ['animal_uuid'],
+        });
+        return found ? (found.get('animal_uuid') as string) : null;
+    }
+
+    async listByRanchForParentSelection(
+        ranch_uuid: string,
+        sex: AnimalSex
+    ): Promise<{ animal_uuid: string; registration_number: string }[]> {
+        const rows = await AnimalModel.findAll({
+            where: { ranch_uuid, sex, is_active: true },
+            attributes: ['animal_uuid', 'registration_number'],
+            order: [['registration_number', 'ASC']],
+        });
+        return rows.map((r) => {
+            const p = r.get({ plain: true }) as { animal_uuid: string; registration_number: string };
+            return { animal_uuid: p.animal_uuid, registration_number: p.registration_number };
+        });
+    }
+
+    async findActiveUuidByRanchRegistrationAndSex(
+        ranch_uuid: string,
+        registration_number: string,
+        sex: AnimalSex
+    ): Promise<string | null> {
+        const row = await AnimalModel.findOne({
+            where: {
+                ranch_uuid,
+                registration_number: registration_number.trim(),
+                sex,
+                is_active: true,
+            },
+            attributes: ['animal_uuid'],
+        });
+        return row ? (row.get('animal_uuid') as string) : null;
     }
 }
 

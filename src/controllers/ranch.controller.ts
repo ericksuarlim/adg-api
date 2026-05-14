@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { RanchAttributes, RanchCreationAttributes } from "../interfaces/ranch/ranch.interface";
-import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
 import { handleResponse } from "../utils/response.handler";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { IDeleteRanchParams, IGetRanchParams, IUpdateRanchParams } from "../interfaces/params/ranchParams.interface";
@@ -16,13 +15,14 @@ import {
 } from "../helpers/access-scope.helper";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
+import RanchService from "../services/ranch.service";
 
 class RanchController {
-    private readonly ranchService: IBaseServiceInterface<RanchAttributes, RanchCreationAttributes>;
+    private readonly ranchService: RanchService;
     private readonly membershipService: MembershipService;
 
     constructor(
-        ranchService: IBaseServiceInterface<RanchAttributes, RanchCreationAttributes>,
+        ranchService: RanchService,
         membershipService: MembershipService
     ) {
         this.ranchService = ranchService;
@@ -100,6 +100,22 @@ class RanchController {
                 uuid_ranch_in: ranchFilter,
             });
 
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    getRanchPaddocks = async (req: AuthRequest & Request<IGetRanchParams>, res: Response, next: NextFunction) => {
+        try {
+            const { uuid_ranch } = req.params;
+            assertRanchTokenAccess(req.user, uuid_ranch);
+            const ranchFilter = ranchFilterFromUser(req.user);
+            const response = await this.ranchService.listActivePaddocks({
+                uuid_ranch,
+                uuid_company: this.isSaasOwner(req) ? undefined : req.user?.uuid_company,
+                uuid_ranch_in: ranchFilter,
+            });
             return handleResponse(res, response);
         } catch (error) {
             next(error);

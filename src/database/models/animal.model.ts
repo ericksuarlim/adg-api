@@ -4,20 +4,19 @@ import { AnimalAttributes, AnimalCreationAttributes } from "../../interfaces/ani
 
 class AnimalModel extends Model<AnimalAttributes, AnimalCreationAttributes> implements AnimalAttributes {
     declare animal_uuid: string;
-    declare uuid_company: string;
     declare ranch_uuid: string;
-    declare breed_uuid: string;
+    declare breed_code: string;
+    declare registration_number: string;
     declare mother_animal_uuid?: string | null;
     declare father_animal_uuid?: string | null;
     declare current_owner_uuid?: string | null;
     declare sex: 'MALE' | 'FEMALE';
     declare color?: string | null;
-    declare birth_date?: Date | null;
+    declare birth_date: Date;
     declare origin_type: 'BIRTH' | 'PURCHASE' | 'TRANSFER' | 'UNKNOWN';
     declare current_status: 'ACTIVE' | 'SOLD' | 'DISPOSED' | 'DEAD' | 'MISSING' | 'INACTIVE';
     declare description?: string | null;
     declare current_paddock_uuid?: string | null;
-    declare current_weight?: number | null;
     declare is_active: boolean;
     declare created_at?: Date;
     declare updated_at?: Date;
@@ -30,16 +29,17 @@ AnimalModel.init(
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
-        uuid_company: {
-            type: DataTypes.UUID,
-            allowNull: false,
-        },
         ranch_uuid: {
             type: DataTypes.UUID,
             allowNull: false,
         },
-        breed_uuid: {
-            type: DataTypes.UUID,
+        breed_code: {
+            type: DataTypes.STRING(64),
+            allowNull: false,
+            defaultValue: 'UNKNOWN',
+        },
+        registration_number: {
+            type: DataTypes.STRING(128),
             allowNull: false,
         },
         mother_animal_uuid: {
@@ -57,6 +57,7 @@ AnimalModel.init(
         sex: {
             type: DataTypes.ENUM('MALE', 'FEMALE'),
             allowNull: false,
+            defaultValue: 'MALE',
         },
         color: {
             type: DataTypes.STRING,
@@ -64,7 +65,7 @@ AnimalModel.init(
         },
         birth_date: {
             type: DataTypes.DATE,
-            allowNull: true,
+            allowNull: false,
         },
         origin_type: {
             type: DataTypes.ENUM('BIRTH', 'PURCHASE', 'TRANSFER', 'UNKNOWN'),
@@ -82,10 +83,6 @@ AnimalModel.init(
         },
         current_paddock_uuid: {
             type: DataTypes.UUID,
-            allowNull: true,
-        },
-        current_weight: {
-            type: DataTypes.DECIMAL(10, 2),
             allowNull: true,
         },
         is_active: {

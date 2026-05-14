@@ -85,18 +85,10 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
         const roles = normalizeUserRoles(decoded.roles ?? []);
         decoded.roles = roles;
 
-        if (!decoded.access_scope || !Array.isArray(decoded.ranch_uuids)) {
+        decoded.access_scope = computeAccessScope(roles);
+        if (!Array.isArray(decoded.ranch_uuids)) {
             const ranchIds = await membershipRepository.findActiveRanchIdsByUser(decoded.sub, decoded.uuid_company);
-            decoded.access_scope = computeAccessScope(roles);
             decoded.ranch_uuids = decoded.access_scope === "saas_global" ? [] : ranchIds;
-        }
-        if (decoded.access_scope === "single_ranch" && (decoded.ranch_uuids?.length ?? 0) !== 1) {
-            return next(new ApiError({
-                name: "Forbidden",
-                statusCode: httpStatus.FORBIDDEN,
-                description: "Your account must be assigned to exactly one ranch. Ask an administrator.",
-                isOperational: true,
-            }));
         }
 
         const isSaasOwner = roles.includes(UserRole.SAAS_OWNER);

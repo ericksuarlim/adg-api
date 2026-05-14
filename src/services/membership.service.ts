@@ -15,7 +15,8 @@ import {RanchAttributes, RanchCreationAttributes} from "../interfaces/ranch/ranc
  * Membresías usuario ↔ rancho (`user_ranches`):
  * - Compañía: N ranchos, N usuarios.
  * - Administrador: puede tener varias membresías activas (N ranchos de esa compañía).
- * - `ranch_staff`: como máximo una membresía activa por compañía (un rancho).
+ * - `ranch_staff`: puede tener varias membresías en la misma compañía; el alcance operativo es por compañía
+ *   (las restricciones son por permisos / rol, no por “un solo rancho”).
  */
 class MembershipService implements IMembershipService<UserRanchAttributes, UserRanchCreationAttributes> {
     private readonly membershipRepository: IMembershipRepository<UserRanchModel, UserRanchCreationAttributes>;
@@ -117,22 +118,6 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
             });
         }
 
-        if (normalizedRole === UserRole.RANCH_STAFF) {
-            const otherRanches = await this.membershipRepository.countActiveMembershipsForUserInCompany(
-                uuid_user,
-                tenantCompany,
-                uuid_ranch
-            );
-            if (otherRanches > 0) {
-                throw new ApiError({
-                    name: 'Forbidden',
-                    statusCode: HttpStatusCodes.FORBIDDEN,
-                    description:
-                        'Ranch staff may have at most one active ranch per company. Administrator is not limited to a single ranch.',
-                });
-            }
-        }
-
         const existing = await this.membershipRepository.findMembership(uuid_user, uuid_ranch);
 
         if (existing?.is_active) {
@@ -179,22 +164,6 @@ class MembershipService implements IMembershipService<UserRanchAttributes, UserR
                 statusCode: HttpStatusCodes.BAD_REQUEST,
                 description: `Role '${role}' is not valid`
             });
-        }
-
-        if (normalizedRole === UserRole.RANCH_STAFF) {
-            const otherRanches = await this.membershipRepository.countActiveMembershipsForUserInCompany(
-                uuid_user,
-                tenantCompany,
-                uuid_ranch
-            );
-            if (otherRanches > 0) {
-                throw new ApiError({
-                    name: 'Forbidden',
-                    statusCode: HttpStatusCodes.FORBIDDEN,
-                    description:
-                        'Ranch staff may have at most one active ranch per company. Administrator is not limited to a single ranch.',
-                });
-            }
         }
 
         const updated = await this.membershipRepository.updateRole(uuid_user, uuid_ranch, normalizedRole);

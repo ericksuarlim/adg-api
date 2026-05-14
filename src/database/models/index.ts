@@ -66,16 +66,6 @@ AnimalModel.belongsTo(RanchModel, {
     as: 'ranch',
 });
 
-CompanyModel.hasMany(AnimalModel, {
-    foreignKey: 'uuid_company',
-    as: 'animals',
-});
-
-AnimalModel.belongsTo(CompanyModel, {
-    foreignKey: 'uuid_company',
-    as: 'company',
-});
-
 AnimalModel.belongsTo(AnimalModel, {
     foreignKey: 'mother_animal_uuid',
     as: 'mother',

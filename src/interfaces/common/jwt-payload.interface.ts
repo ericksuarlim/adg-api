@@ -1,6 +1,7 @@
 import { UserRole } from "../roles/roles.interface";
 import { MembershipStatus } from "../../constants/domain.constants";
 
+/** `single_ranch` puede aparecer en tokens antiguos; el backend recalcula alcance desde roles. */
 export type AccessScope = "saas_global" | "company_all_ranches" | "single_ranch";
 
 export interface JwtPayload {

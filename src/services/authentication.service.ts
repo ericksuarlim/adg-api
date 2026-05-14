@@ -92,24 +92,6 @@ class AuthenticationService implements IAuthenticationService {
             user.uuid_company
         );
         const access_scope = computeAccessScope(roles);
-        if (access_scope === "single_ranch") {
-            if (ranchIds.length === 0) {
-                throw new ApiError({
-                    name: "BadRequest",
-                    statusCode: HttpStatusCodes.BAD_REQUEST,
-                    description:
-                        "No active ranch membership for this company. Ask an administrator to assign this user to a ranch, or assign a company administrator role.",
-                });
-            }
-            if (ranchIds.length !== 1) {
-                throw new ApiError({
-                    name: "BadRequest",
-                    statusCode: HttpStatusCodes.BAD_REQUEST,
-                    description:
-                        "Ranch staff must have exactly one active ranch in this company. Administrator may have multiple ranches.",
-                });
-            }
-        }
         const ranch_uuids = access_scope === "saas_global" ? [] : ranchIds;
 
         const company = await CompanyModel.findOne({

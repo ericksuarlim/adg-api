@@ -8,6 +8,7 @@ import ranchRoutes from "./ranch.routes";
 import membershipRoutes from "./membership.routes";
 import { authenticate } from "../middlewares/auth.middleware";
 import publicRoutes from "./public.routes";
+import ownerRoutes from "./owner.routes";
 import referenceSampleRoutes from "./reference-sample.routes";
 
 const router = Router();
@@ -18,6 +19,7 @@ router.use('/public', publicRoutes);
 router.use(authenticate);
 router.use('/reference-sample', referenceSampleRoutes);
 router.use('/animal', animalRoutes);
+router.use('/owner', ownerRoutes);
 router.use('/user', userRoutes);
 router.use('/company', companyRoutes);
 router.use('/ranch', ranchRoutes);

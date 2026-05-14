@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { AnimalAttributes, AnimalCreationAttributes } from "../interfaces/animal/animal.interface";
+import { AnimalWriteRequestBody } from "../interfaces/animal/animal-registration.interface";
 import { handleResponse } from "../utils/response.handler";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
-import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
 import { IDeleteAnimalParams, IGetAnimalParams, IUpdateAnimalParams } from "../interfaces/params/animalParams.interface";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
@@ -10,13 +10,12 @@ import { UserRole } from "../interfaces/roles/roles.interface";
 import { assertRanchTokenAccess, ranchFilterFromUser } from "../helpers/access-scope.helper";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
+import AnimalService, { AnimalCreateContext } from "../services/animal.service";
+import { CATTLE_BREED_OPTIONS } from "../constants/cattle-breed.constants";
+import { AnimalSex } from "../interfaces/animal/animal.interface";
 
 class AnimalController {
-    private readonly animalService: IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes>;
-
-    constructor(animalService: IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes>) {
-        this.animalService = animalService;
-    }
+    constructor(private readonly animalService: AnimalService) {}
 
     private isSaasOwner(req: AuthRequest): boolean {
         return (req.user?.roles ?? []).includes(UserRole.SAAS_OWNER);
@@ -30,26 +29,58 @@ class AnimalController {
         };
     }
 
+    listBreeds = async (_req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            return handleResponse(res, { success: true, data: CATTLE_BREED_OPTIONS });
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    listParentCandidates = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const ranch_uuid = typeof req.query.ranch_uuid === "string" ? req.query.ranch_uuid : "";
+            const sexRaw = typeof req.query.sex === "string" ? req.query.sex.toUpperCase() : "";
+            if (!ranch_uuid.trim()) {
+                throw new ApiError({
+                    name: "ValidationError",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: "ranch_uuid query parameter is required",
+                });
+            }
+            if (sexRaw !== "MALE" && sexRaw !== "FEMALE") {
+                throw new ApiError({
+                    name: "ValidationError",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: "sex query parameter must be MALE or FEMALE",
+                });
+            }
+            assertRanchTokenAccess(req.user, ranch_uuid);
+            const tenant = this.animalTenant(req);
+            const response = await this.animalService.listParentCandidates(
+                ranch_uuid,
+                sexRaw as AnimalSex,
+                tenant
+            );
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
     createAnimal = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
-            const animalBody = req.body as AnimalCreationAttributes;
-            if (this.isSaasOwner(req)) {
-                if (!animalBody.uuid_company?.trim()) {
-                    throw new ApiError({
-                        name: "ValidationError",
-                        statusCode: HttpStatusCodes.BAD_REQUEST,
-                        description: "uuid_company is required in body when creating animals as SaaS owner",
-                    });
-                }
-            } else {
-                animalBody.uuid_company = req.user?.uuid_company as string;
-            }
-
+            const animalBody = req.body as AnimalWriteRequestBody;
             if (animalBody.ranch_uuid) {
                 assertRanchTokenAccess(req.user, animalBody.ranch_uuid);
             }
 
-            const response = await this.animalService.create(animalBody);
+            const ctx: AnimalCreateContext = {
+                jwtCompanyUuid: req.user?.uuid_company,
+                isSaasOwner: this.isSaasOwner(req),
+            };
+
+            const response = await this.animalService.create(animalBody as AnimalCreationAttributes, ctx);
 
             if (!response.success) {
                 return res.status(response.code ?? 500).json(response);
@@ -104,12 +135,8 @@ class AnimalController {
     updateAnimal = async (req: AuthRequest & Request<IUpdateAnimalParams>, res: Response, next: NextFunction) => {
         try {
             const { uuid_animal } = req.params;
-            const animalBody = req.body as AnimalCreationAttributes;
+            const animalBody = req.body as AnimalWriteRequestBody;
             const tenant = this.animalTenant(req);
-
-            if (!this.isSaasOwner(req)) {
-                animalBody.uuid_company = req.user?.uuid_company as string;
-            }
 
             const existing = await this.animalService.getById({
                 id: uuid_animal,
@@ -119,7 +146,7 @@ class AnimalController {
             });
             assertRanchTokenAccess(req.user, existing.data!.ranch_uuid);
 
-            const response = await this.animalService.update(uuid_animal, animalBody, tenant);
+            const response = await this.animalService.update(uuid_animal, animalBody as AnimalCreationAttributes, tenant);
             return handleResponse(res, response);
         } catch (error) {
             next(error);

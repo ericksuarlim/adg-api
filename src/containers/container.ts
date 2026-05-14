@@ -31,6 +31,8 @@ import ReferenceSampleController from "../controllers/reference-sample.controlle
 import CompanyPaymentRepository from "../repositories/company-payment.repository";
 import CompanyPaymentService from "../services/company-payment.service";
 import CompanyPaymentController from "../controllers/company-payment.controller";
+import OwnerRepository from "../repositories/owner.repository";
+import OwnerController from "../controllers/owner.controller";
 
 //Repositories
 const companyRepository = new CompanyRepository();
@@ -44,6 +46,7 @@ const membershipRepository = new MembershipRepository();
 const companyOnboardingRepository = new CompanyOnboardingRepository();
 const referenceSampleRepository = new ReferenceSampleRepository();
 const companyPaymentRepository = new CompanyPaymentRepository();
+const ownerRepository = new OwnerRepository();
 
 //Services
 const passwordValidatorService = new PasswordValidatorService();
@@ -79,6 +82,7 @@ const authenticationController = new AuthenticationController(authenticationServ
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
 const companyPaymentController = new CompanyPaymentController(companyPaymentService);
+const ownerController = new OwnerController(ownerRepository);
 
 export { membershipRepository };
 
@@ -91,5 +95,6 @@ export const container = {
     authenticationController,
     membershipController,
     referenceSampleController,
-    companyPaymentController
+    companyPaymentController,
+    ownerController
 }

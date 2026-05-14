@@ -4,24 +4,23 @@ import { JwtPayload, AccessScope } from "../interfaces/common/jwt-payload.interf
 import { normalizeUserRoles, UserRole } from "../interfaces/roles/roles.interface";
 
 /**
- * Alcance de acceso a ranchos según roles en JWT / membresía:
- * - `company_all_ranches`: administrador (y SaaS) puede operar en cualquier rancho activo de su compañía.
- * - `single_ranch`: `ranch_staff` must have exactly one active ranch on login.
+ * Alcance geográfico (qué ranchos de la compañía puede tocar la API):
+ * - `saas_global`: SaaS owner.
+ * - `company_all_ranches`: administrador y operador (`ranch_staff`) operan en cualquier rancho de su compañía.
+ *   La diferencia staff vs administrador es de permisos (módulos), no de rancho.
+ * - `single_ranch`: legado en JWT; ya no se emite desde `computeAccessScope`.
  */
 export function computeAccessScope(roles: UserRole[]): AccessScope {
     if (roles.includes(UserRole.SAAS_OWNER)) {
         return "saas_global";
     }
-    if (roles.includes(UserRole.ADMINISTRATOR)) {
+    if (roles.includes(UserRole.ADMINISTRATOR) || roles.includes(UserRole.RANCH_STAFF)) {
         return "company_all_ranches";
     }
-    return "single_ranch";
+    return "company_all_ranches";
 }
 
 export function resolveAccessScope(user: JwtPayload | undefined): AccessScope {
-    if (user?.access_scope) {
-        return user.access_scope;
-    }
     return computeAccessScope(normalizeUserRoles(user?.roles ?? []));
 }
 

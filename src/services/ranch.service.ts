@@ -5,13 +5,19 @@ import { IBaseRepository } from "../interfaces/repositories/base-repository.inte
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { RanchModel } from "../database/models";
+import PaddockRepository from "../repositories/paddock.repository";
 
 class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreationAttributes> {
 
     private readonly ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>;
+    private readonly paddockRepository: PaddockRepository;
 
-    constructor(ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>) {
+    constructor(
+        ranchRepository: IBaseRepository<RanchModel, RanchCreationAttributes>,
+        paddockRepository?: PaddockRepository
+    ) {
         this.ranchRepository = ranchRepository;
+        this.paddockRepository = paddockRepository ?? new PaddockRepository();
     }
 
     async getAll(params: {
@@ -135,6 +141,28 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             success: true,
             data: null
         };
+    }
+
+    async listActivePaddocks(params: {
+        uuid_ranch: string;
+        uuid_company?: string;
+        uuid_ranch_in?: string[];
+    }): Promise<ServiceResponse<{ paddock_uuid: string; name: string }[]>> {
+        const gate = await this.getById({
+            id: params.uuid_ranch,
+            includeInactive: false,
+            uuid_company: params.uuid_company,
+            uuid_ranch_in: params.uuid_ranch_in,
+        });
+        if (!gate.success || !gate.data) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Ranch not found'
+            });
+        }
+        const rows = await this.paddockRepository.findActiveByRanch(params.uuid_ranch);
+        return { success: true, data: rows };
     }
 }
 
