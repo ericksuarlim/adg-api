@@ -17,7 +17,11 @@ export const mapErrorHelper = (err: any): ApiError => {
                     ? 'USERNAME_IN_USE'
                     : path === 'id_card'
                         ? 'ID_CARD_IN_USE'
-                        : 'DUPLICATE_VALUE';
+                        : path === 'name'
+                            ? 'COMPANY_NAME_IN_USE'
+                            : path === 'tax_id'
+                                ? 'TAX_ID_IN_USE'
+                                : 'DUPLICATE_VALUE';
 
         return new ApiError({
             name: 'ConflictError',

@@ -3,7 +3,11 @@ import { IBaseParams } from "../params/query.interface";
 import { UserRole } from "../roles/roles.interface";
 import { UserRanchAttributes } from '../ranch/user-ranch.interface';
 
-export type MembershipTenantOptions = { allowCrossTenant?: boolean; actorRoles?: UserRole[] };
+export type MembershipTenantOptions = {
+    allowCrossTenant?: boolean;
+    actorRoles?: UserRole[];
+    requestingUuidUser?: string;
+};
 
 /** Body for POST /membership — company-scoped role (uuid_ranch ignored if sent). */
 export type CompanyMembershipAssignBody = {

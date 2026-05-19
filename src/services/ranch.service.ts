@@ -157,7 +157,18 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
         uuid_ranch: string;
         uuid_company?: string;
         uuid_ranch_in?: string[];
-    }): Promise<ServiceResponse<{ paddock_uuid: string; name: string }[]>> {
+    }): Promise<
+        ServiceResponse<
+            {
+                paddock_uuid: string;
+                name: string;
+                size_in_hectares: number | null;
+                grass_type: string | null;
+                water_source: string | null;
+                maximum_capacity: number | null;
+            }[]
+        >
+    > {
         const gate = await this.getById({
             id: params.uuid_ranch,
             includeInactive: false,
@@ -172,7 +183,17 @@ class RanchService implements IBaseServiceInterface<RanchAttributes, RanchCreati
             });
         }
         const rows = await this.paddockRepository.findActiveByRanch(params.uuid_ranch);
-        return { success: true, data: rows };
+        return {
+            success: true,
+            data: rows.map((row) => ({
+                paddock_uuid: row.paddock_uuid,
+                name: row.name,
+                size_in_hectares: row.size_in_hectares ?? null,
+                grass_type: row.grass_type ?? null,
+                water_source: row.water_source ?? null,
+                maximum_capacity: row.maximum_capacity ?? null,
+            })),
+        };
     }
 }
 

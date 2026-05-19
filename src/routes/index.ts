@@ -9,6 +9,7 @@ import membershipRoutes from "./membership.routes";
 import { authenticate } from "../middlewares/auth.middleware";
 import { resolveTenantOperationalContext } from "../middlewares/tenant-context.middleware";
 import ownerRoutes from "./owner.routes";
+import paddockRoutes from "./paddock.routes";
 import referenceSampleRoutes from "./reference-sample.routes";
 
 const router = Router();
@@ -26,6 +27,7 @@ operationalRouter.use(resolveTenantOperationalContext);
 operationalRouter.use('/ranch', ranchRoutes);
 operationalRouter.use('/animal', animalRoutes);
 operationalRouter.use('/owner', ownerRoutes);
+operationalRouter.use('/paddock', paddockRoutes);
 operationalRouter.use('/animal-work-session', animalWorkSessionRoutes);
 operationalRouter.use('/membership', membershipRoutes);
 

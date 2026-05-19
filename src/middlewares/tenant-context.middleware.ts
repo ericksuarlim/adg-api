@@ -14,6 +14,19 @@ function readUuidCompanyFromQuery(req: AuthRequest): string | undefined {
     return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : undefined;
 }
 
+/** Express may expose `/ranch` or `/` + baseUrl depending on mount order; match list GET reliably. */
+function isRanchCollectionListRequest(req: AuthRequest): boolean {
+    if (req.method !== 'GET') {
+        return false;
+    }
+    const path = (req.path ?? '').replace(/\/+$/, '') || '/';
+    if (path === '/ranch' || path.endsWith('/ranch')) {
+        return true;
+    }
+    const url = (req.originalUrl ?? req.url ?? '').split('?')[0].replace(/\/+$/, '');
+    return url === '/ranch' || url.endsWith('/ranch');
+}
+
 /**
  * Resolves the tenant PostgreSQL database for the current request and exposes models via AsyncLocalStorage.
  * Must run after `authenticate`. SaaS owners: `GET /ranch` without `uuid_company` lists all ranches across
@@ -34,7 +47,7 @@ export const resolveTenantOperationalContext = async (req: AuthRequest, res: Res
         const roles = req.user.roles ?? [];
         const isSaasOwner = roles.includes(UserRole.SAAS_OWNER);
 
-        if (isSaasOwner && req.method === 'GET' && req.path === '/ranch' && !readUuidCompanyFromQuery(req)) {
+        if (isSaasOwner && isRanchCollectionListRequest(req) && !readUuidCompanyFromQuery(req)) {
             const payload = await listRanchesForSaasOwner(req.query as Record<string, unknown>);
             return res.status(200).json(payload);
         }
@@ -83,8 +96,7 @@ export const resolveTenantOperationalContext = async (req: AuthRequest, res: Res
              * tenant_database; listing ranches should return an empty page instead of 503 so SaaS
              * UIs (user management, company detail) can still load users.
              */
-            const isRanchCollectionList = req.method === 'GET' && req.path === '/ranch';
-            if (isRanchCollectionList) {
+            if (isRanchCollectionListRequest(req)) {
                 const params = buildGetAllParams(req.query);
                 return res.status(200).json({
                     success: true,

@@ -31,6 +31,9 @@ import CompanyPaymentService from "../services/company-payment.service";
 import CompanyPaymentController from "../controllers/company-payment.controller";
 import OwnerRepository from "../repositories/owner.repository";
 import OwnerController from "../controllers/owner.controller";
+import PaddockRepository from "../repositories/paddock.repository";
+import PaddockService from "../services/paddock.service";
+import PaddockController from "../controllers/paddock.controller";
 
 //Repositories
 const companyRepository = new CompanyRepository();
@@ -44,13 +47,15 @@ const membershipRepository = new MembershipRepository();
 const referenceSampleRepository = new ReferenceSampleRepository();
 const companyPaymentRepository = new CompanyPaymentRepository();
 const ownerRepository = new OwnerRepository();
+const paddockRepository = new PaddockRepository();
 
 //Services
 const passwordValidatorService = new PasswordValidatorService();
 const tenantProvisioningService = new TenantProvisioningService();
 const companyService = new CompanyService(companyRepository, companyPaymentRepository, tenantProvisioningService);
 const userService = new UserService(userRepository, userRepository, companyService, passwordValidatorService);
-const ranchService = new RanchService(ranchRepository);
+const paddockService = new PaddockService(paddockRepository, ranchRepository);
+const ranchService = new RanchService(ranchRepository, paddockRepository);
 const animalService = new AnimalService(animalRepository, companyService);
 const animalWorkSessionService = new AnimalWorkSessionService(animalWorkSessionRepository);
 const sessionService = new SessionService(sessionRepository);
@@ -75,6 +80,7 @@ const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
 const companyPaymentController = new CompanyPaymentController(companyPaymentService);
 const ownerController = new OwnerController(ownerRepository);
+const paddockController = new PaddockController(paddockService);
 
 export { membershipRepository };
 
@@ -88,5 +94,6 @@ export const container = {
     membershipController,
     referenceSampleController,
     companyPaymentController,
-    ownerController
+    ownerController,
+    paddockController
 }

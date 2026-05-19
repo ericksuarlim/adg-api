@@ -7,6 +7,7 @@ export function createAnimalModel(sequelize: Sequelize): ModelStatic<Model<Anima
         declare ranch_uuid: string;
         declare breed_code: string;
         declare registration_number: string;
+        declare chip_number?: string | null;
         declare mother_animal_uuid?: string | null;
         declare father_animal_uuid?: string | null;
         declare current_owner_uuid?: string | null;
@@ -41,6 +42,10 @@ export function createAnimalModel(sequelize: Sequelize): ModelStatic<Model<Anima
             registration_number: {
                 type: DataTypes.STRING(128),
                 allowNull: false,
+            },
+            chip_number: {
+                type: DataTypes.STRING(128),
+                allowNull: true,
             },
             mother_animal_uuid: {
                 type: DataTypes.UUID,

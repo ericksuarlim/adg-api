@@ -339,12 +339,24 @@ class UserService implements IUserManagerServiceInterface<UserAttributes> {
         };
     }
 
-    async delete(uuid_user: string, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>> {
+    async delete(
+        uuid_user: string,
+        tenantContext?: { uuid_company?: string; requestingUuidUser?: string }
+    ): Promise<ServiceResponse<null>> {
         if (!uuid_user || uuid_user.trim() === '') {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
                 description: 'Username is required'
+            });
+        }
+
+        const requestingUuidUser = tenantContext?.requestingUuidUser?.trim();
+        if (requestingUuidUser && requestingUuidUser === uuid_user) {
+            throw new ApiError({
+                name: 'Forbidden',
+                statusCode: HttpStatusCodes.FORBIDDEN,
+                description: 'CANNOT_DEACTIVATE_SELF',
             });
         }
 

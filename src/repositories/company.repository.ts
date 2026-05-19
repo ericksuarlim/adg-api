@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import {CompanyCreationAttributes} from "../interfaces/company/company.interface";
 import {CompanyModel} from "../database/models";
 import {IBaseRepository} from "../interfaces/repositories/base-repository.interface";
@@ -119,6 +120,36 @@ class CompanyRepository implements
         }
 
         return updated[0];
+    }
+
+    async findConflictingName(name: string, excludeUuid?: string): Promise<CompanyModel | null> {
+        const trimmed = name.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const where: Record<string, unknown> = {
+            name: { [Op.iLike]: trimmed },
+        };
+        if (excludeUuid) {
+            where.uuid_company = { [Op.ne]: excludeUuid };
+        }
+
+        return await CompanyModel.findOne({ where });
+    }
+
+    async findConflictingTaxId(taxId: string, excludeUuid?: string): Promise<CompanyModel | null> {
+        const trimmed = taxId.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const where: Record<string, unknown> = { tax_id: trimmed };
+        if (excludeUuid) {
+            where.uuid_company = { [Op.ne]: excludeUuid };
+        }
+
+        return await CompanyModel.findOne({ where });
     }
 
     async updateTenantProvisioning(

@@ -208,6 +208,33 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         return new Date(utcMs);
     }
 
+    private normalizeOptionalChip(raw: unknown): string | null {
+        if (raw === null || raw === undefined) {
+            return null;
+        }
+        const trimmed = String(raw).trim();
+        return trimmed.length > 0 ? trimmed : null;
+    }
+
+    private async assertChipUniqueInRanch(
+        ranchUuid: string,
+        chip_number: string,
+        options?: { excludeAnimalUuid?: string }
+    ): Promise<void> {
+        const conflict = await this.animalRepository.findAnimalUuidByRanchAndChip(
+            ranchUuid,
+            chip_number,
+            options
+        );
+        if (conflict) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'chip_number must be unique within the ranch'
+            });
+        }
+    }
+
     async getAll(params: IBaseParams): Promise<ServiceResponse<AnimalAttributes[]>> {
         const { rows, count } = await this.animalRepository.findAll(params);
         const plainAnimals = rows.map((animal: Model<AnimalAttributes, AnimalCreationAttributes>) => animal.get({ plain: true }));
@@ -335,10 +362,16 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
 
         const birth_date = this.assertNormalizedBirthDate(body.birth_date);
 
+        const chip_number = this.normalizeOptionalChip(body.chip_number);
+        if (chip_number) {
+            await this.assertChipUniqueInRanch(ranchUuid, chip_number);
+        }
+
         const payload: AnimalCreationAttributes = {
             ranch_uuid: ranchUuid,
             breed_code,
             registration_number,
+            chip_number,
             mother_animal_uuid,
             father_animal_uuid,
             current_owner_uuid: body.current_owner_uuid ?? null,
@@ -452,6 +485,14 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             }
         }
 
+        let chip_number = currentAttrs.chip_number ?? null;
+        if (body.chip_number !== undefined) {
+            chip_number = this.normalizeOptionalChip(body.chip_number);
+        }
+        if (chip_number) {
+            await this.assertChipUniqueInRanch(nextRanch, chip_number, { excludeAnimalUuid: id });
+        }
+
         let mother_animal_uuid = body.mother_animal_uuid !== undefined ? body.mother_animal_uuid : currentAttrs.mother_animal_uuid;
         let father_animal_uuid = body.father_animal_uuid !== undefined ? body.father_animal_uuid : currentAttrs.father_animal_uuid;
 
@@ -501,6 +542,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             ranch_uuid: body.ranch_uuid ?? plain.ranch_uuid,
             breed_code: body.breed_code ?? plain.breed_code,
             registration_number: body.registration_number ?? plain.registration_number,
+            chip_number,
             mother_animal_uuid,
             father_animal_uuid,
             current_owner_uuid: body.current_owner_uuid !== undefined ? body.current_owner_uuid : plain.current_owner_uuid ?? null,

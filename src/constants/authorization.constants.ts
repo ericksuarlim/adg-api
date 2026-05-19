@@ -14,6 +14,8 @@ export enum Permission {
     RANCH_READ = "RANCH_READ",
     /** Crear / editar / eliminar rancho (solo SaaS y administrador). */
     RANCH_WRITE = "RANCH_WRITE",
+    PADDOCK_READ = "PADDOCK_READ",
+    PADDOCK_WRITE = "PADDOCK_WRITE",
     MEMBERSHIP_READ = "MEMBERSHIP_READ",
     MEMBERSHIP_WRITE = "MEMBERSHIP_WRITE",
     ANIMAL_READ = "ANIMAL_READ",
@@ -33,6 +35,8 @@ export const PERMISSION_ROLE_MAP: Record<Permission, UserRole[]> = {
     [Permission.USER_WRITE]: [UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
     [Permission.RANCH_READ]: [UserRole.RANCH_STAFF, UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
     [Permission.RANCH_WRITE]: [UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
+    [Permission.PADDOCK_READ]: [UserRole.RANCH_STAFF, UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
+    [Permission.PADDOCK_WRITE]: [UserRole.RANCH_STAFF, UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
     [Permission.MEMBERSHIP_READ]: [UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
     [Permission.MEMBERSHIP_WRITE]: [UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],
     [Permission.ANIMAL_READ]: [UserRole.RANCH_STAFF, UserRole.ADMINISTRATOR, UserRole.SAAS_OWNER],

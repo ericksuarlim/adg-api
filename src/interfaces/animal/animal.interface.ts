@@ -10,6 +10,8 @@ export interface AnimalAttributes {
     /** Controlled vocabulary; see `cattle-breed.constants`. */
     breed_code: string;
     registration_number: string;
+    /** Ear tag / RFID; optional and unique per ranch when set. */
+    chip_number?: string | null;
     mother_animal_uuid?: string | null;
     father_animal_uuid?: string | null;
     current_owner_uuid?: string | null;
@@ -31,6 +33,7 @@ export type AnimalCreationAttributes = Optional<
     | 'mother_animal_uuid'
     | 'father_animal_uuid'
     | 'current_owner_uuid'
+    | 'chip_number'
     | 'color'
     | 'description'
     | 'current_paddock_uuid'

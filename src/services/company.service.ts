@@ -10,6 +10,7 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { ITenantProvisioningService } from "../interfaces/services/tenant-provisioning-service.interface";
 import { attachOperationalTenantToCompany } from "../helpers/company-operational-tenant.helper";
+import { CompanyFieldAvailabilityResult } from "../interfaces/company/company-availability.interface";
 
 class CompanyService implements IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes> {
 
@@ -48,6 +49,10 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
 
     async create(companyBody: CompanyCreationAttributes, _options?: unknown): Promise<ServiceResponse<CompanyAttributes>> {
         const payload = this.buildCompanyCreatePayload(companyBody);
+        await this.assertUniqueCompanyFields({
+            name: payload.name,
+            tax_id: payload.tax_id ?? null,
+        });
         const company = await this.companyRepository.create(payload);
         const uuid_company = company.uuid_company;
 
@@ -128,10 +133,18 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
             });
         }
 
-        const payload = this.buildCompanyPayload(
-            companyBody,
-            currentCompany.get({ plain: true })
+        const current = currentCompany.get({ plain: true });
+        const payload = this.buildCompanyPayload(companyBody, current);
+        const effectiveName = payload.name != null ? String(payload.name).trim() : current.name;
+        const effectiveTaxId = payload.tax_id !== undefined
+            ? this.normalizeOptionalString(payload.tax_id)
+            : (current.tax_id ?? null);
+
+        await this.assertUniqueCompanyFields(
+            { name: effectiveName, tax_id: effectiveTaxId },
+            uuid_company
         );
+
         const updatedCompany = await this.companyRepository.update(uuid_company, payload, tenantContext);
 
         if (!updatedCompany) {
@@ -381,11 +394,87 @@ class CompanyService implements IBaseServiceInterface<CompanyAttributes, Company
         return payload;
     }
 
-    private buildCompanyCreatePayload(companyBody: CompanyCreationAttributes): CompanyCreationAttributes {
+    async checkCompanyFieldAvailability(params: {
+        name?: string;
+        tax_id?: string;
+        exclude_uuid_company?: string;
+    }): Promise<ServiceResponse<CompanyFieldAvailabilityResult>> {
+        const name = params.name?.trim();
+        const taxId = params.tax_id?.trim();
+
+        if (!name && !taxId) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'At least one of name or tax_id is required',
+            });
+        }
+
+        const [nameHit, taxIdHit] = await Promise.all([
+            name
+                ? this.companyRepository.findConflictingName(name, params.exclude_uuid_company)
+                : Promise.resolve(null),
+            taxId
+                ? this.companyRepository.findConflictingTaxId(taxId, params.exclude_uuid_company)
+                : Promise.resolve(null),
+        ]);
+
         return {
-            name: companyBody.name,
-            legal_name: companyBody.legal_name ?? null,
-            tax_id: companyBody.tax_id ?? null,
+            success: true,
+            data: {
+                nameAvailable: name ? !nameHit : true,
+                taxIdAvailable: taxId ? !taxIdHit : true,
+            },
+        };
+    }
+
+    private async assertUniqueCompanyFields(
+        fields: { name: string; tax_id: string | null },
+        excludeUuid?: string
+    ): Promise<void> {
+        const [nameHit, taxIdHit] = await Promise.all([
+            this.companyRepository.findConflictingName(fields.name, excludeUuid),
+            fields.tax_id
+                ? this.companyRepository.findConflictingTaxId(fields.tax_id, excludeUuid)
+                : Promise.resolve(null),
+        ]);
+
+        if (nameHit) {
+            throw new ApiError({
+                name: 'Conflict',
+                statusCode: HttpStatusCodes.CONFLICT,
+                description: 'COMPANY_NAME_IN_USE',
+            });
+        }
+
+        if (taxIdHit) {
+            throw new ApiError({
+                name: 'Conflict',
+                statusCode: HttpStatusCodes.CONFLICT,
+                description: 'TAX_ID_IN_USE',
+            });
+        }
+    }
+
+    private normalizeOptionalString(value?: string | null): string | null {
+        const trimmed = value?.trim();
+        return trimmed ? trimmed : null;
+    }
+
+    private buildCompanyCreatePayload(companyBody: CompanyCreationAttributes): CompanyCreationAttributes {
+        const name = String(companyBody.name ?? '').trim();
+        if (!name) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company trade name is required',
+            });
+        }
+
+        return {
+            name,
+            legal_name: this.normalizeOptionalString(companyBody.legal_name),
+            tax_id: this.normalizeOptionalString(companyBody.tax_id),
             is_active: companyBody.is_active ?? true,
             membership_status: 'CANCELLED',
             membership_started_at: null,

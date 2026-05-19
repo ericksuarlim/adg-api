@@ -31,6 +31,7 @@ CompanyModel.init(
         name: {
             type: DataTypes.STRING,
             allowNull: false,
+            unique: true,
         },
         legal_name: {
             type: DataTypes.STRING,

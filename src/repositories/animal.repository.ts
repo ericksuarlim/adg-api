@@ -153,6 +153,27 @@ class AnimalRepository implements
         });
     }
 
+    async findAnimalUuidByRanchAndChip(
+        ranch_uuid: string,
+        chip_number: string,
+        options?: { excludeAnimalUuid?: string }
+    ): Promise<string | null> {
+        const { AnimalModel } = requireTenantModels();
+        const where: Record<string, unknown> = {
+            ranch_uuid,
+            chip_number: chip_number.trim(),
+            is_active: true,
+        };
+        if (options?.excludeAnimalUuid) {
+            where.animal_uuid = { [Op.ne]: options.excludeAnimalUuid };
+        }
+        const found = await AnimalModel.findOne({
+            where,
+            attributes: ['animal_uuid'],
+        });
+        return found ? (found.get('animal_uuid') as string) : null;
+    }
+
     async findAnimalUuidByRanchAndRegistration(
         ranch_uuid: string,
         registration_number: string,

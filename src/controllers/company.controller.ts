@@ -24,6 +24,26 @@ class CompanyController {
         return (req.user?.roles ?? []).includes(UserRole.SAAS_OWNER);
     }
 
+    checkCompanyFieldAvailability = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const name = typeof req.query.name === 'string' ? req.query.name : undefined;
+            const tax_id = typeof req.query.tax_id === 'string' ? req.query.tax_id : undefined;
+            const exclude_uuid_company = typeof req.query.exclude_uuid_company === 'string'
+                ? req.query.exclude_uuid_company
+                : undefined;
+
+            const response = await this.companyService.checkCompanyFieldAvailability({
+                name,
+                tax_id,
+                exclude_uuid_company,
+            });
+
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
     createCompany = async (req: AuthRequest, res: Response, next: NextFunction) => {
         try {
             const reqBody = req.body as CompanyCreationAttributes;
