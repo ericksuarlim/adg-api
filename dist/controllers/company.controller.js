@@ -6,6 +6,24 @@ const roles_interface_1 = require("../interfaces/roles/roles.interface");
 const access_scope_helper_1 = require("../helpers/access-scope.helper");
 class CompanyController {
     constructor(companyService) {
+        this.checkCompanyFieldAvailability = async (req, res, next) => {
+            try {
+                const name = typeof req.query.name === 'string' ? req.query.name : undefined;
+                const tax_id = typeof req.query.tax_id === 'string' ? req.query.tax_id : undefined;
+                const exclude_uuid_company = typeof req.query.exclude_uuid_company === 'string'
+                    ? req.query.exclude_uuid_company
+                    : undefined;
+                const response = await this.companyService.checkCompanyFieldAvailability({
+                    name,
+                    tax_id,
+                    exclude_uuid_company,
+                });
+                return (0, response_handler_1.handleResponse)(res, response);
+            }
+            catch (error) {
+                next(error);
+            }
+        };
         this.createCompany = async (req, res, next) => {
             try {
                 const reqBody = req.body;

@@ -278,6 +278,14 @@ class UserService {
                 description: 'Username is required'
             });
         }
+        const requestingUuidUser = tenantContext?.requestingUuidUser?.trim();
+        if (requestingUuidUser && requestingUuidUser === uuid_user) {
+            throw new apiError_1.default({
+                name: 'Forbidden',
+                statusCode: httpStatusCodes_1.default.FORBIDDEN,
+                description: 'CANNOT_DEACTIVATE_SELF',
+            });
+        }
         const deleted = await this.userRepository.delete(uuid_user, tenantContext);
         if (!deleted) {
             throw new apiError_1.default({

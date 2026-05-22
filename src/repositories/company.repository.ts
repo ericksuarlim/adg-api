@@ -3,6 +3,7 @@ import {CompanyCreationAttributes} from "../interfaces/company/company.interface
 import {CompanyModel} from "../database/models";
 import {IBaseRepository} from "../interfaces/repositories/base-repository.interface";
 import {IBaseParams} from "../interfaces/params/query.interface";
+import { buildSearchOrClause } from "../utils/search-where.util";
 
 class CompanyRepository implements
     IBaseRepository<CompanyModel, CompanyCreationAttributes> {
@@ -24,6 +25,11 @@ class CompanyRepository implements
         }
         if (params.uuid_company) {
             where.uuid_company = params.uuid_company;
+        }
+
+        const searchClause = buildSearchOrClause(params.search, ["name", "legal_name", "tax_id"]);
+        if (searchClause) {
+            Object.assign(where, searchClause);
         }
 
         return await CompanyModel.findAndCountAll({

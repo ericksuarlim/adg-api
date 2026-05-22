@@ -124,6 +124,10 @@ class AnimalController {
             if (ranchFilter?.length) {
                 params.uuid_ranch_in = ranchFilter;
             }
+            const sexRaw = typeof req.query.sex === "string" ? req.query.sex.trim().toUpperCase() : "";
+            if (sexRaw === "MALE" || sexRaw === "FEMALE") {
+                params.sex = sexRaw;
+            }
 
             const response = await this.animalService.getAll(params);
             return handleResponse(res, response);

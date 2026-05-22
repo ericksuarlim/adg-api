@@ -94,6 +94,7 @@ class MembershipController {
         return {
             allowCrossTenant: roles.includes(roles_interface_1.UserRole.SAAS_OWNER),
             actorRoles: (0, roles_interface_1.normalizeUserRoles)(roles),
+            requestingUuidUser: req.user?.sub,
         };
     }
 }

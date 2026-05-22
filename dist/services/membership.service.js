@@ -194,7 +194,10 @@ class MembershipService {
             });
         }
         const tenantCompany = await this.resolveTenantCompanyForUser(uuid_user, jwtCompany, options);
-        const removed = await this.userService.delete(uuid_user, { uuid_company: tenantCompany });
+        const removed = await this.userService.delete(uuid_user, {
+            uuid_company: tenantCompany,
+            requestingUuidUser: options?.requestingUuidUser,
+        });
         if (!removed.success) {
             throw new apiError_1.default({
                 name: "NotFound",

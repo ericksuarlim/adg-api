@@ -10,6 +10,14 @@ export interface IBaseParams {
     uuid_company?: string;
     /** Limitar listados a ranchos concretos (alcance single_ranch). */
     uuid_ranch_in?: string[];
+    /** Case-insensitive partial match across resource-specific text fields. */
+    search?: string;
+    /** Animal list filter: MALE | FEMALE (omit or ALL for no filter). */
+    sex?: string;
+}
+
+export interface SearchQuery {
+    search?: string;
 }
 
 export interface PaginationQuery {

@@ -14,6 +14,7 @@ const membership_routes_1 = __importDefault(require("./membership.routes"));
 const auth_middleware_1 = require("../middlewares/auth.middleware");
 const tenant_context_middleware_1 = require("../middlewares/tenant-context.middleware");
 const owner_routes_1 = __importDefault(require("./owner.routes"));
+const paddock_routes_1 = __importDefault(require("./paddock.routes"));
 const reference_sample_routes_1 = __importDefault(require("./reference-sample.routes"));
 const router = (0, express_1.Router)();
 router.use('/session', authentication_routes_1.default);
@@ -27,6 +28,7 @@ operationalRouter.use(tenant_context_middleware_1.resolveTenantOperationalContex
 operationalRouter.use('/ranch', ranch_routes_1.default);
 operationalRouter.use('/animal', animal_routes_1.default);
 operationalRouter.use('/owner', owner_routes_1.default);
+operationalRouter.use('/paddock', paddock_routes_1.default);
 operationalRouter.use('/animal-work-session', animal_work_session_routes_1.default);
 operationalRouter.use('/membership', membership_routes_1.default);
 router.use(operationalRouter);

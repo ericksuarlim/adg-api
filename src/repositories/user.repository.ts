@@ -5,7 +5,6 @@ import {IBaseRepository} from "../interfaces/repositories/base-repository.interf
 import { normalizeLoginCredential } from "../utils/login-credential.util";
 import { Op, fn, col, where } from "sequelize";
 import { IBaseParams } from "../interfaces/params/query.interface";
-
 class UserRepository implements
     IBaseRepository<UserModel, UserCreationAttributes>,
     IUserManagerRepository<UserModel> {
@@ -16,22 +15,55 @@ class UserRepository implements
 
         const offset = (page - 1) * size;
 
-        const where: any = {};
+        const baseWhere: Record<string, unknown> = {};
 
         if (status === 'active') {
-            where.is_active = true;
+            baseWhere.is_active = true;
         } else if (status === 'inactive') {
-            where.is_active = false;
+            baseWhere.is_active = false;
         }
         if (params.uuid_company) {
-            where.uuid_company = params.uuid_company;
+            baseWhere.uuid_company = params.uuid_company;
+        }
+
+        const searchTerm = params.search?.trim();
+        const include = searchTerm
+            ? [{
+                model: CompanyModel,
+                as: "company",
+                attributes: ["uuid_company", "name"],
+                required: false,
+            }]
+            : [];
+
+        let where: Record<string, unknown> = baseWhere;
+        if (searchTerm) {
+            const pattern = `%${searchTerm}%`;
+            where = {
+                [Op.and]: [
+                    baseWhere,
+                    {
+                        [Op.or]: [
+                            { username: { [Op.iLike]: pattern } },
+                            { email: { [Op.iLike]: pattern } },
+                            { first_name: { [Op.iLike]: pattern } },
+                            { last_name: { [Op.iLike]: pattern } },
+                            { id_card: { [Op.iLike]: pattern } },
+                            { "$company.name$": { [Op.iLike]: pattern } },
+                        ],
+                    },
+                ],
+            };
         }
 
         return await UserModel.findAndCountAll({
             where,
+            include,
             offset,
             limit: size,
             order: [[sortBy, order]],
+            distinct: Boolean(searchTerm),
+            subQuery: false,
         });
     }
 

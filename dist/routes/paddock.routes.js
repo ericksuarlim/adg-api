@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const paddockRoutes = (0, express_1.Router)();
+paddockRoutes.get("/", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.PADDOCK_READ), container_1.container.paddockController.listByRanch);
+paddockRoutes.post("/", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.PADDOCK_WRITE), container_1.container.paddockController.create);
+paddockRoutes.get("/:paddock_uuid", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.PADDOCK_READ), container_1.container.paddockController.getById);
+paddockRoutes.put("/:paddock_uuid", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.PADDOCK_WRITE), container_1.container.paddockController.update);
+paddockRoutes.delete("/:paddock_uuid", (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.PADDOCK_WRITE), container_1.container.paddockController.delete);
+exports.default = paddockRoutes;

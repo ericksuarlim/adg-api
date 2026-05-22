@@ -24,6 +24,10 @@ function createAnimalModel(sequelize) {
             type: sequelize_1.DataTypes.STRING(128),
             allowNull: false,
         },
+        chip_number: {
+            type: sequelize_1.DataTypes.STRING(128),
+            allowNull: true,
+        },
         mother_animal_uuid: {
             type: sequelize_1.DataTypes.UUID,
             allowNull: true,

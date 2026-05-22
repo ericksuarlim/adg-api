@@ -36,7 +36,11 @@ const company_payment_repository_1 = __importDefault(require("../repositories/co
 const company_payment_service_1 = __importDefault(require("../services/company-payment.service"));
 const company_payment_controller_1 = __importDefault(require("../controllers/company-payment.controller"));
 const owner_repository_1 = __importDefault(require("../repositories/owner.repository"));
+const owner_service_1 = __importDefault(require("../services/owner.service"));
 const owner_controller_1 = __importDefault(require("../controllers/owner.controller"));
+const paddock_repository_1 = __importDefault(require("../repositories/paddock.repository"));
+const paddock_service_1 = __importDefault(require("../services/paddock.service"));
+const paddock_controller_1 = __importDefault(require("../controllers/paddock.controller"));
 //Repositories
 const companyRepository = new company_repository_1.default();
 const userRepository = new user_repository_1.default();
@@ -50,12 +54,14 @@ exports.membershipRepository = membershipRepository;
 const referenceSampleRepository = new reference_sample_repository_1.default();
 const companyPaymentRepository = new company_payment_repository_1.default();
 const ownerRepository = new owner_repository_1.default();
+const paddockRepository = new paddock_repository_1.default();
 //Services
 const passwordValidatorService = new password_validator_service_1.default();
 const tenantProvisioningService = new tenant_provisioning_service_1.default();
 const companyService = new company_service_1.default(companyRepository, companyPaymentRepository, tenantProvisioningService);
 const userService = new user_services_1.default(userRepository, userRepository, companyService, passwordValidatorService);
-const ranchService = new ranch_service_1.default(ranchRepository);
+const paddockService = new paddock_service_1.default(paddockRepository, ranchRepository);
+const ranchService = new ranch_service_1.default(ranchRepository, paddockRepository);
 const animalService = new animal_service_1.default(animalRepository, companyService);
 const animalWorkSessionService = new animal_work_session_service_1.default(animalWorkSessionRepository);
 const sessionService = new session_service_1.default(sessionRepository);
@@ -63,6 +69,7 @@ const authenticationService = new authentication_service_1.default(authenticatio
 const membershipService = new membership_service_1.default(userService, ranchService);
 const referenceSampleService = new reference_sample_service_1.default(referenceSampleRepository);
 const companyPaymentService = new company_payment_service_1.default(companyPaymentRepository, companyService);
+const ownerService = new owner_service_1.default(ownerRepository);
 //Controllers
 const userController = new user_controller_1.default(userService, userService);
 const companyController = new company_controller_1.default(companyService);
@@ -73,7 +80,8 @@ const authenticationController = new authentication_controller_1.default(authent
 const membershipController = new membership_controller_1.default(membershipService);
 const referenceSampleController = new reference_sample_controller_1.default(referenceSampleService);
 const companyPaymentController = new company_payment_controller_1.default(companyPaymentService);
-const ownerController = new owner_controller_1.default(ownerRepository);
+const ownerController = new owner_controller_1.default(ownerService);
+const paddockController = new paddock_controller_1.default(paddockService);
 exports.container = {
     userController,
     companyController,
@@ -84,5 +92,6 @@ exports.container = {
     membershipController,
     referenceSampleController,
     companyPaymentController,
-    ownerController
+    ownerController,
+    paddockController
 };

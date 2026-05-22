@@ -17,6 +17,10 @@ var Permission;
     Permission["RANCH_READ"] = "RANCH_READ";
     /** Crear / editar / eliminar rancho (solo SaaS y administrador). */
     Permission["RANCH_WRITE"] = "RANCH_WRITE";
+    Permission["PADDOCK_READ"] = "PADDOCK_READ";
+    Permission["PADDOCK_WRITE"] = "PADDOCK_WRITE";
+    Permission["OWNER_READ"] = "OWNER_READ";
+    Permission["OWNER_WRITE"] = "OWNER_WRITE";
     Permission["MEMBERSHIP_READ"] = "MEMBERSHIP_READ";
     Permission["MEMBERSHIP_WRITE"] = "MEMBERSHIP_WRITE";
     Permission["ANIMAL_READ"] = "ANIMAL_READ";
@@ -29,12 +33,16 @@ var Permission;
 exports.PERMISSION_ROLE_MAP = {
     [Permission.COMPANY_READ]: [roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.COMPANY_WRITE]: [roles_interface_1.UserRole.SAAS_OWNER],
-    [Permission.COMPANY_TENANT_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.COMPANY_TENANT_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.COMPANY_TENANT_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.USER_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.USER_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.RANCH_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.RANCH_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.PADDOCK_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.PADDOCK_WRITE]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.OWNER_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
+    [Permission.OWNER_WRITE]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.MEMBERSHIP_READ]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.MEMBERSHIP_WRITE]: [roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],
     [Permission.ANIMAL_READ]: [roles_interface_1.UserRole.RANCH_STAFF, roles_interface_1.UserRole.ADMINISTRATOR, roles_interface_1.UserRole.SAAS_OWNER],

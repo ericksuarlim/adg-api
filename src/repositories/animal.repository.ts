@@ -4,6 +4,7 @@ import { Status } from "../interfaces/params/query.interface";
 import { Op } from "sequelize";
 import type { Model } from "sequelize";
 import { requireTenantModels } from "../database/tenant/tenant-request-context";
+import { buildSearchOrClause } from "../utils/search-where.util";
 
 type AnimalRow = Model<AnimalAttributes, AnimalCreationAttributes>;
 
@@ -19,6 +20,8 @@ class AnimalRepository implements
             status?: Status;
             uuid_company?: string;
             uuid_ranch_in?: string[];
+            search?: string;
+            sex?: string;
         }
     ): Promise<{ rows: AnimalRow[]; count: number }> {
         const { AnimalModel, RanchModel } = requireTenantModels();
@@ -30,6 +33,22 @@ class AnimalRepository implements
             where.is_active = true;
         } else if (status === 'inactive') {
             where.is_active = false;
+        }
+
+        const sex = params.sex?.trim().toUpperCase();
+        if (sex === "MALE" || sex === "FEMALE") {
+            where.sex = sex;
+        }
+
+        const searchClause = buildSearchOrClause(params.search, [
+            "registration_number",
+            "chip_number",
+            "breed_code",
+            "color",
+            "description",
+        ]);
+        if (searchClause) {
+            Object.assign(where, searchClause);
         }
 
         const needsRanchJoin = Boolean(params.uuid_company) || Boolean(params.uuid_ranch_in?.length);

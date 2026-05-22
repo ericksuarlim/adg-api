@@ -119,7 +119,17 @@ class RanchService {
             });
         }
         const rows = await this.paddockRepository.findActiveByRanch(params.uuid_ranch);
-        return { success: true, data: rows };
+        return {
+            success: true,
+            data: rows.map((row) => ({
+                paddock_uuid: row.paddock_uuid,
+                name: row.name,
+                size_in_hectares: row.size_in_hectares ?? null,
+                grass_type: row.grass_type ?? null,
+                water_source: row.water_source ?? null,
+                maximum_capacity: row.maximum_capacity ?? null,
+            })),
+        };
     }
 }
 exports.default = RanchService;

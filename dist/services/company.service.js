@@ -29,6 +29,10 @@ class CompanyService {
     }
     async create(companyBody, _options) {
         const payload = this.buildCompanyCreatePayload(companyBody);
+        await this.assertUniqueCompanyFields({
+            name: payload.name,
+            tax_id: payload.tax_id ?? null,
+        });
         const company = await this.companyRepository.create(payload);
         const uuid_company = company.uuid_company;
         await (0, company_operational_tenant_helper_1.attachOperationalTenantToCompany)(uuid_company, this.tenantProvisioningService, this.companyRepository);
@@ -89,7 +93,13 @@ class CompanyService {
                 description: 'Company not found or inactive'
             });
         }
-        const payload = this.buildCompanyPayload(companyBody, currentCompany.get({ plain: true }));
+        const current = currentCompany.get({ plain: true });
+        const payload = this.buildCompanyPayload(companyBody, current);
+        const effectiveName = payload.name != null ? String(payload.name).trim() : current.name;
+        const effectiveTaxId = payload.tax_id !== undefined
+            ? this.normalizeOptionalString(payload.tax_id)
+            : (current.tax_id ?? null);
+        await this.assertUniqueCompanyFields({ name: effectiveName, tax_id: effectiveTaxId }, uuid_company);
         const updatedCompany = await this.companyRepository.update(uuid_company, payload, tenantContext);
         if (!updatedCompany) {
             throw new apiError_1.default({
@@ -288,11 +298,71 @@ class CompanyService {
         payload.membership_renewal_at = this.calculateMembershipRenewalAt(effectiveStartedAt, effectiveBillingCycle);
         return payload;
     }
-    buildCompanyCreatePayload(companyBody) {
+    async checkCompanyFieldAvailability(params) {
+        const name = params.name?.trim();
+        const taxId = params.tax_id?.trim();
+        if (!name && !taxId) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'At least one of name or tax_id is required',
+            });
+        }
+        const [nameHit, taxIdHit] = await Promise.all([
+            name
+                ? this.companyRepository.findConflictingName(name, params.exclude_uuid_company)
+                : Promise.resolve(null),
+            taxId
+                ? this.companyRepository.findConflictingTaxId(taxId, params.exclude_uuid_company)
+                : Promise.resolve(null),
+        ]);
         return {
-            name: companyBody.name,
-            legal_name: companyBody.legal_name ?? null,
-            tax_id: companyBody.tax_id ?? null,
+            success: true,
+            data: {
+                nameAvailable: name ? !nameHit : true,
+                taxIdAvailable: taxId ? !taxIdHit : true,
+            },
+        };
+    }
+    async assertUniqueCompanyFields(fields, excludeUuid) {
+        const [nameHit, taxIdHit] = await Promise.all([
+            this.companyRepository.findConflictingName(fields.name, excludeUuid),
+            fields.tax_id
+                ? this.companyRepository.findConflictingTaxId(fields.tax_id, excludeUuid)
+                : Promise.resolve(null),
+        ]);
+        if (nameHit) {
+            throw new apiError_1.default({
+                name: 'Conflict',
+                statusCode: httpStatusCodes_1.default.CONFLICT,
+                description: 'COMPANY_NAME_IN_USE',
+            });
+        }
+        if (taxIdHit) {
+            throw new apiError_1.default({
+                name: 'Conflict',
+                statusCode: httpStatusCodes_1.default.CONFLICT,
+                description: 'TAX_ID_IN_USE',
+            });
+        }
+    }
+    normalizeOptionalString(value) {
+        const trimmed = value?.trim();
+        return trimmed ? trimmed : null;
+    }
+    buildCompanyCreatePayload(companyBody) {
+        const name = String(companyBody.name ?? '').trim();
+        if (!name) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'Company trade name is required',
+            });
+        }
+        return {
+            name,
+            legal_name: this.normalizeOptionalString(companyBody.legal_name),
+            tax_id: this.normalizeOptionalString(companyBody.tax_id),
             is_active: companyBody.is_active ?? true,
             membership_status: 'CANCELLED',
             membership_started_at: null,

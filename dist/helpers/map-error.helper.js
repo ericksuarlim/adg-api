@@ -19,7 +19,11 @@ const mapErrorHelper = (err) => {
                 ? 'USERNAME_IN_USE'
                 : path === 'id_card'
                     ? 'ID_CARD_IN_USE'
-                    : 'DUPLICATE_VALUE';
+                    : path === 'name'
+                        ? 'COMPANY_NAME_IN_USE'
+                        : path === 'tax_id'
+                            ? 'TAX_ID_IN_USE'
+                            : 'DUPLICATE_VALUE';
         return new apiError_1.default({
             name: 'ConflictError',
             statusCode: httpStatusCodes_1.default.CONFLICT,

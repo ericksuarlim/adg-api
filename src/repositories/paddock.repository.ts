@@ -1,15 +1,89 @@
 import { Op } from "sequelize";
 import { PaddockAttributes, PaddockCreationAttributes } from "../interfaces/paddock/paddock.interface";
 import { requireTenantModels } from "../database/tenant/tenant-request-context";
+import { IBaseParams } from "../interfaces/params/query.interface";
+export type PaddockListRow = PaddockAttributes & {
+    ranch_name?: string;
+};
+
+export interface PaddockListParams extends IBaseParams {
+    ranch_uuid?: string;
+}
 
 class PaddockRepository {
-    async findActiveByRanch(ranch_uuid: string): Promise<PaddockAttributes[]> {
-        const { PaddockModel } = requireTenantModels();
-        const rows = await PaddockModel.findAll({
-            where: { ranch_uuid, is_active: true },
-            order: [["name", "ASC"]],
+    async findAll(params: PaddockListParams): Promise<{ rows: PaddockListRow[]; count: number }> {
+        const { PaddockModel, RanchModel } = requireTenantModels();
+        const { page, size, order } = params;
+        const offset = (page - 1) * size;
+
+        const paddockWhere: Record<string | symbol, unknown> = { is_active: true };
+        const searchTerm = params.search?.trim();
+        if (searchTerm) {
+            const pattern = `%${searchTerm}%`;
+            paddockWhere[Op.or as unknown as string] = [
+                { name: { [Op.iLike]: pattern } },
+                { grass_type: { [Op.iLike]: pattern } },
+                { water_source: { [Op.iLike]: pattern } },
+                { description: { [Op.iLike]: pattern } },
+                { "$ranch.name$": { [Op.iLike]: pattern } },
+            ];
+        }
+
+        const ranchWhere: Record<string, unknown> = { is_active: true };
+        if (params.ranch_uuid) {
+            paddockWhere.ranch_uuid = params.ranch_uuid;
+        } else if (params.uuid_ranch_in?.length) {
+            paddockWhere.ranch_uuid = { [Op.in]: params.uuid_ranch_in };
+        }
+        if (params.uuid_company) {
+            ranchWhere.uuid_company = params.uuid_company;
+        }
+
+        const sortBy = params.sortBy === "ranch_name" ? "ranch_name" : "name";
+        const orderClause =
+            sortBy === "ranch_name"
+                ? [[{ model: RanchModel, as: "ranch" }, "name", order], ["name", order]]
+                : [["name", order]];
+
+        const { rows, count } = await PaddockModel.findAndCountAll({
+            where: paddockWhere,
+            include: [{
+                model: RanchModel,
+                as: "ranch",
+                required: true,
+                attributes: ["uuid_ranch", "name", "uuid_company"],
+                where: ranchWhere,
+            }],
+            order: orderClause as never,
+            offset,
+            limit: size,
+            distinct: true,
+            subQuery: false,
         });
-        return rows.map((r) => r.get({ plain: true }) as PaddockAttributes);
+
+        const mapped = rows.map((row) => {
+            const plain = row.get({ plain: true }) as PaddockAttributes & {
+                ranch?: { name: string };
+            };
+            return {
+                ...plain,
+                ranch_name: plain.ranch?.name,
+            };
+        });
+
+        return { rows: mapped, count };
+    }
+
+    async findActiveByRanch(ranch_uuid: string): Promise<PaddockAttributes[]> {
+        const result = await this.findAll({
+            page: 1,
+            size: 500,
+            sortBy: "name",
+            order: "ASC",
+            status: "active",
+            ranch_uuid,
+        });
+        return result.rows;
     }
 
     async findById(params: {

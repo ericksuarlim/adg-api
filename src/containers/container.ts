@@ -30,6 +30,7 @@ import CompanyPaymentRepository from "../repositories/company-payment.repository
 import CompanyPaymentService from "../services/company-payment.service";
 import CompanyPaymentController from "../controllers/company-payment.controller";
 import OwnerRepository from "../repositories/owner.repository";
+import OwnerService from "../services/owner.service";
 import OwnerController from "../controllers/owner.controller";
 import PaddockRepository from "../repositories/paddock.repository";
 import PaddockService from "../services/paddock.service";
@@ -68,6 +69,7 @@ const authenticationService = new AuthenticationService(
 const membershipService = new MembershipService(userService, ranchService);
 const referenceSampleService = new ReferenceSampleService(referenceSampleRepository);
 const companyPaymentService = new CompanyPaymentService(companyPaymentRepository, companyService);
+const ownerService = new OwnerService(ownerRepository);
 
 //Controllers
 const userController = new UserController(userService, userService);
@@ -79,7 +81,7 @@ const authenticationController = new AuthenticationController(authenticationServ
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
 const companyPaymentController = new CompanyPaymentController(companyPaymentService);
-const ownerController = new OwnerController(ownerRepository);
+const ownerController = new OwnerController(ownerService);
 const paddockController = new PaddockController(paddockService);
 
 export { membershipRepository };

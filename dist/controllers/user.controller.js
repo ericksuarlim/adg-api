@@ -125,7 +125,8 @@ class UserController {
             try {
                 const { uuid_user } = req.params;
                 const response = await this.userService.delete(uuid_user, {
-                    uuid_company: this.isSaasOwner(req) ? undefined : req.user?.uuid_company
+                    uuid_company: this.isSaasOwner(req) ? undefined : req.user?.uuid_company,
+                    requestingUuidUser: req.user?.sub,
                 });
                 return (0, response_handler_1.handleResponse)(res, response, 200);
             }

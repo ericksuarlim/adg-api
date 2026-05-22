@@ -7,21 +7,52 @@ class UserRepository {
     async findAll(params) {
         const { page, size, sortBy, order, status } = params;
         const offset = (page - 1) * size;
-        const where = {};
+        const baseWhere = {};
         if (status === 'active') {
-            where.is_active = true;
+            baseWhere.is_active = true;
         }
         else if (status === 'inactive') {
-            where.is_active = false;
+            baseWhere.is_active = false;
         }
         if (params.uuid_company) {
-            where.uuid_company = params.uuid_company;
+            baseWhere.uuid_company = params.uuid_company;
+        }
+        const searchTerm = params.search?.trim();
+        const include = searchTerm
+            ? [{
+                    model: models_1.CompanyModel,
+                    as: "company",
+                    attributes: ["uuid_company", "name"],
+                    required: false,
+                }]
+            : [];
+        let where = baseWhere;
+        if (searchTerm) {
+            const pattern = `%${searchTerm}%`;
+            where = {
+                [sequelize_1.Op.and]: [
+                    baseWhere,
+                    {
+                        [sequelize_1.Op.or]: [
+                            { username: { [sequelize_1.Op.iLike]: pattern } },
+                            { email: { [sequelize_1.Op.iLike]: pattern } },
+                            { first_name: { [sequelize_1.Op.iLike]: pattern } },
+                            { last_name: { [sequelize_1.Op.iLike]: pattern } },
+                            { id_card: { [sequelize_1.Op.iLike]: pattern } },
+                            { "$company.name$": { [sequelize_1.Op.iLike]: pattern } },
+                        ],
+                    },
+                ],
+            };
         }
         return await models_1.UserModel.findAndCountAll({
             where,
+            include,
             offset,
             limit: size,
             order: [[sortBy, order]],
+            distinct: Boolean(searchTerm),
+            subQuery: false,
         });
     }
     async findById(params) {

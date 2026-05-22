@@ -17,6 +17,7 @@ CompanyModel.init({
     name: {
         type: sequelize_1.DataTypes.STRING,
         allowNull: false,
+        unique: true,
     },
     legal_name: {
         type: sequelize_1.DataTypes.STRING,

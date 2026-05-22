@@ -11,6 +11,7 @@ const company_payment_routes_1 = __importDefault(require("./company-payment.rout
 const companyRoutes = (0, express_1.Router)();
 companyRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.createCompany);
 companyRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_READ), container_1.container.companyController.getCompanies);
+companyRoutes.get('/availability', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_READ), container_1.container.companyController.checkCompanyFieldAvailability);
 companyRoutes.get('/:uuid_company', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_READ), container_1.container.companyController.getCompany);
 companyRoutes.put('/:uuid_company', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_TENANT_WRITE), container_1.container.companyController.updateCompany);
 companyRoutes.post('/:uuid_company/activate-trial', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.COMPANY_WRITE), container_1.container.companyController.activateTrial);
