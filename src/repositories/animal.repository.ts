@@ -8,6 +8,25 @@ import { buildSearchOrClause } from "../utils/search-where.util";
 
 type AnimalRow = Model<AnimalAttributes, AnimalCreationAttributes>;
 
+const ANIMAL_SORT_COLUMNS: Record<string, string> = {
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    registrationNumber: 'registration_number',
+    birthDate: 'birth_date',
+    breedCode: 'breed_code',
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+    registration_number: 'registration_number',
+    birth_date: 'birth_date',
+    breed_code: 'breed_code',
+    sex: 'sex',
+    color: 'color',
+};
+
+function resolveAnimalSortColumn(sortBy: string): string {
+    return ANIMAL_SORT_COLUMNS[sortBy] ?? 'created_at';
+}
+
 class AnimalRepository implements
     IBaseRepository<AnimalRow, AnimalCreationAttributes> {
 
@@ -72,7 +91,8 @@ class AnimalRepository implements
             include,
             offset,
             limit: size,
-            order: [[sortBy, order]],
+            order: [[resolveAnimalSortColumn(sortBy), order]],
+            distinct: needsRanchJoin,
         });
     }
 

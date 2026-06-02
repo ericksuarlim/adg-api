@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AnimalAttributes, AnimalCreationAttributes } from "../interfaces/animal/animal.interface";
 import { AnimalWriteRequestBody } from "../interfaces/animal/animal-registration.interface";
+import { AnimalBatchCreateRequestBody } from "../interfaces/animal/animal-batch.interface";
 import { handleResponse } from "../utils/response.handler";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
@@ -63,6 +64,46 @@ class AnimalController {
                 tenant
             );
             return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    createBatch = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const body = req.body as AnimalBatchCreateRequestBody;
+            const rows = body?.rows;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                throw new ApiError({
+                    name: "ValidationError",
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: "rows array is required and must not be empty",
+                });
+            }
+
+            const ranchIds = new Set<string>();
+            for (const item of rows) {
+                const ranch = item?.animal?.ranch_uuid;
+                if (typeof ranch === "string" && ranch.trim()) {
+                    ranchIds.add(ranch.trim());
+                }
+            }
+            for (const ranchUuid of ranchIds) {
+                assertRanchTokenAccess(req.user, ranchUuid);
+            }
+
+            const ctx: AnimalCreateContext = {
+                jwtCompanyUuid: req.user?.uuid_company,
+                isSaasOwner: this.isSaasOwner(req),
+            };
+
+            const response = await this.animalService.createBatch(rows, ctx);
+            if (!response.success) {
+                return res.status(response.code ?? 500).json(response);
+            }
+
+            const status = response.data && response.data.failed > 0 && response.data.created > 0 ? 207 : 201;
+            return handleResponse(res, response, status);
         } catch (error) {
             next(error);
         }

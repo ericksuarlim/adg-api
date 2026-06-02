@@ -11,7 +11,7 @@ services:
   postgres:
     image: postgres:15
     container_name: adg-api-postgres
-    restart: unless-stopped
+    restart: "no"
     ports:
       - "${ADG_DB_HOST_PORT:-15432}:5432"
     environment:

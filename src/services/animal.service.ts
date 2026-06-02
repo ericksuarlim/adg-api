@@ -1,6 +1,11 @@
 import { ServiceResponse } from "../interfaces/common/service-response.interface";
 import { AnimalAttributes, AnimalCreationAttributes, AnimalSex } from "../interfaces/animal/animal.interface";
 import { AnimalWriteRequestBody } from "../interfaces/animal/animal-registration.interface";
+import {
+    AnimalBatchCreateResult,
+    AnimalBatchRowInput,
+    AnimalBatchRowResult,
+} from "../interfaces/animal/animal-batch.interface";
 import { IBaseServiceInterface } from "../interfaces/services/base-service.interface";
 import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
@@ -20,7 +25,22 @@ export type AnimalCreateContext = {
     isSaasOwner: boolean;
 };
 
+/** Max rows per batch request (aligned with UI grid cap). */
+const ANIMAL_BATCH_MAX_ROWS = 500;
+
 type RanchRow = Model<RanchAttributes, RanchCreationAttributes>;
+
+type HeadBudget = {
+    baseCount: number;
+    createdInBatch: number;
+    limit: number;
+    planLabel: string;
+};
+
+type BatchDuplicateKeys = {
+    seenRegistration: Set<string>;
+    seenChip: Set<string>;
+};
 
 class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes> {
 
@@ -256,16 +276,197 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         createContext?: AnimalCreateContext
     ): Promise<ServiceResponse<AnimalAttributes>> {
         const body = animalBody as AnimalWriteRequestBody;
+        const ctx: AnimalCreateContext = createContext ?? { isSaasOwner: false };
+        const headBudgets = new Map<string, HeadBudget>();
+        const data = await this.persistNewAnimal(body, ctx, headBudgets);
+        return { success: true, data };
+    }
+
+    /**
+     * Creates many animals in one request. Each row is processed independently:
+     * successes are persisted; failures return per-row errors (partial save).
+     */
+    async createBatch(
+        rows: AnimalBatchRowInput[],
+        createContext?: AnimalCreateContext
+    ): Promise<ServiceResponse<AnimalBatchCreateResult>> {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'rows array is required and must not be empty',
+            });
+        }
+        if (rows.length > ANIMAL_BATCH_MAX_ROWS) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Batch cannot exceed ${ANIMAL_BATCH_MAX_ROWS} rows`,
+            });
+        }
+
+        const ctx: AnimalCreateContext = createContext ?? { isSaasOwner: false };
+        const headBudgets = new Map<string, HeadBudget>();
+        const batchKeys: BatchDuplicateKeys = {
+            seenRegistration: new Set<string>(),
+            seenChip: new Set<string>(),
+        };
+
+        const results: AnimalBatchRowResult[] = [];
+
+        for (const item of rows) {
+            const index = Number(item?.index);
+            if (!Number.isInteger(index) || index < 0) {
+                results.push({
+                    index: Number.isFinite(index) ? index : -1,
+                    success: false,
+                    error: 'index must be a non-negative integer',
+                });
+                continue;
+            }
+
+            const animalBody = item?.animal as AnimalWriteRequestBody | undefined;
+            if (!animalBody || typeof animalBody !== 'object') {
+                results.push({ index, success: false, error: 'animal payload is required' });
+                continue;
+            }
+
+            try {
+                const created = await this.persistNewAnimal(animalBody, ctx, headBudgets, batchKeys);
+                results.push({
+                    index,
+                    success: true,
+                    animal_uuid: created.animal_uuid,
+                });
+            } catch (error) {
+                results.push({
+                    index,
+                    success: false,
+                    error: this.errorMessageFromUnknown(error),
+                });
+            }
+        }
+
+        const created = results.filter((r) => r.success).length;
+        const failed = results.length - created;
+
+        return {
+            success: true,
+            data: {
+                created,
+                failed,
+                results,
+            },
+        };
+    }
+
+    private registrationKey(ranchUuid: string, registrationNumber: string): string {
+        return `${ranchUuid}\u0000${registrationNumber.trim().toLowerCase()}`;
+    }
+
+    private chipKey(ranchUuid: string, chipNumber: string): string {
+        return `${ranchUuid}\u0000${chipNumber.trim().toLowerCase()}`;
+    }
+
+    private assertNoBatchDuplicate(
+        ranchUuid: string,
+        registration_number: string,
+        chip_number: string | null,
+        batchKeys: BatchDuplicateKeys
+    ): void {
+        const regKey = this.registrationKey(ranchUuid, registration_number);
+        if (batchKeys.seenRegistration.has(regKey)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'registration_number is duplicated within this batch for the same ranch',
+            });
+        }
+        if (chip_number) {
+            const cKey = this.chipKey(ranchUuid, chip_number);
+            if (batchKeys.seenChip.has(cKey)) {
+                throw new ApiError({
+                    name: 'ValidationError',
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: 'chip_number is duplicated within this batch for the same ranch',
+                });
+            }
+        }
+    }
+
+    private rememberBatchKeys(
+        ranchUuid: string,
+        registration_number: string,
+        chip_number: string | null,
+        batchKeys: BatchDuplicateKeys
+    ): void {
+        batchKeys.seenRegistration.add(this.registrationKey(ranchUuid, registration_number));
+        if (chip_number) {
+            batchKeys.seenChip.add(this.chipKey(ranchUuid, chip_number));
+        }
+    }
+
+    private async resolveHeadBudget(
+        tenantCompany: string,
+        headBudgets: Map<string, HeadBudget>
+    ): Promise<HeadBudget> {
+        let budget = headBudgets.get(tenantCompany);
+        if (budget) {
+            return budget;
+        }
+
+        const companyResponse = await this.companyService.getById({ id: tenantCompany, includeInactive: true });
+        if (!companyResponse.success || !companyResponse.data) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Company not found',
+            });
+        }
+
+        const plan = normalizeCompanyPlanType(companyResponse.data.plan_type);
+        const limit = PLAN_HEAD_LIMIT[plan];
+        const baseCount = await this.animalRepository.countActiveByCompany(tenantCompany);
+        budget = { baseCount, createdInBatch: 0, limit, planLabel: plan };
+        headBudgets.set(tenantCompany, budget);
+        return budget;
+    }
+
+    private assertHeadBudgetAvailable(budget: HeadBudget): void {
+        if (budget.baseCount + budget.createdInBatch >= budget.limit) {
+            throw new ApiError({
+                name: 'PlanAnimalHeadLimitReached',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Animal head limit reached for this company (${budget.limit} heads for plan ${budget.planLabel})`,
+            });
+        }
+    }
+
+    private errorMessageFromUnknown(error: unknown): string {
+        if (error instanceof ApiError) {
+            return error.description || error.message || 'Request failed';
+        }
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return 'Request failed';
+    }
+
+    private async persistNewAnimal(
+        body: AnimalWriteRequestBody,
+        ctx: AnimalCreateContext,
+        headBudgets: Map<string, HeadBudget>,
+        batchKeys?: BatchDuplicateKeys
+    ): Promise<AnimalAttributes> {
         const ranchUuid = body.ranch_uuid?.trim();
         if (!ranchUuid) {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'ranch_uuid is required'
+                description: 'ranch_uuid is required',
             });
         }
 
-        const ctx: AnimalCreateContext = createContext ?? { isSaasOwner: false };
         const tenantCompany = await this.resolveTenantCompanyForRanch(ranchUuid, ctx);
 
         const registration_number = body.registration_number?.trim();
@@ -273,8 +474,14 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'registration_number is required'
+                description: 'registration_number is required',
             });
+        }
+
+        const chip_number = this.normalizeOptionalChip(body.chip_number);
+
+        if (batchKeys) {
+            this.assertNoBatchDuplicate(ranchUuid, registration_number, chip_number, batchKeys);
         }
 
         const duplicate = await this.animalRepository.findAnimalUuidByRanchAndRegistration(
@@ -285,7 +492,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'registration_number must be unique within the ranch'
+                description: 'registration_number must be unique within the ranch',
             });
         }
 
@@ -294,7 +501,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'Invalid or missing breed_code'
+                description: 'Invalid or missing breed_code',
             });
         }
 
@@ -322,7 +529,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
                 throw new ApiError({
                     name: 'ValidationError',
                     statusCode: HttpStatusCodes.BAD_REQUEST,
-                    description: 'Owner not found or inactive'
+                    description: 'Owner not found or inactive',
                 });
             }
         }
@@ -333,36 +540,18 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
                 throw new ApiError({
                     name: 'ValidationError',
                     statusCode: HttpStatusCodes.BAD_REQUEST,
-                    description: 'Paddock not found or does not belong to this ranch'
+                    description: 'Paddock not found or does not belong to this ranch',
                 });
             }
         }
 
         await this.validateRanchBelongsToCompany(ranchUuid, { uuid_company: tenantCompany });
 
-        const companyResponse = await this.companyService.getById({ id: tenantCompany, includeInactive: true });
-        if (!companyResponse.success || !companyResponse.data) {
-            throw new ApiError({
-                name: 'ValidationError',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'Company not found'
-            });
-        }
-
-        const plan = normalizeCompanyPlanType(companyResponse.data.plan_type);
-        const headLimit = PLAN_HEAD_LIMIT[plan];
-        const currentHeads = await this.animalRepository.countActiveByCompany(tenantCompany);
-        if (currentHeads >= headLimit) {
-            throw new ApiError({
-                name: 'PlanAnimalHeadLimitReached',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: `Animal head limit reached for this company (${headLimit} heads for plan ${plan})`
-            });
-        }
+        const budget = await this.resolveHeadBudget(tenantCompany, headBudgets);
+        this.assertHeadBudgetAvailable(budget);
 
         const birth_date = this.assertNormalizedBirthDate(body.birth_date);
 
-        const chip_number = this.normalizeOptionalChip(body.chip_number);
         if (chip_number) {
             await this.assertChipUniqueInRanch(ranchUuid, chip_number);
         }
@@ -386,7 +575,13 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         };
 
         const animal = await this.animalRepository.create(payload);
-        return { success: true, data: animal.get({ plain: true }) };
+        budget.createdInBatch += 1;
+
+        if (batchKeys) {
+            this.rememberBatchKeys(ranchUuid, registration_number, chip_number, batchKeys);
+        }
+
+        return animal.get({ plain: true }) as AnimalAttributes;
     }
 
     async getById(params: {
