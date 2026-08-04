@@ -9,3 +9,7 @@ export interface IUpdateAnimalParams {
 export interface IGetAnimalParams {
     uuid_animal: string
 }
+
+export interface IDeactivateAnimalParams {
+    uuid_animal: string
+}

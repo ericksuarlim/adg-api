@@ -5,7 +5,7 @@ export function createAnimalModel(sequelize: Sequelize): ModelStatic<Model<Anima
     class AnimalModel extends Model<AnimalAttributes, AnimalCreationAttributes> implements AnimalAttributes {
         declare animal_uuid: string;
         declare ranch_uuid: string;
-        declare breed_code: string;
+        declare breed_code?: string | null;
         declare registration_number: string;
         declare chip_number?: string | null;
         declare mother_animal_uuid?: string | null;
@@ -36,8 +36,7 @@ export function createAnimalModel(sequelize: Sequelize): ModelStatic<Model<Anima
             },
             breed_code: {
                 type: DataTypes.STRING(64),
-                allowNull: false,
-                defaultValue: 'UNKNOWN',
+                allowNull: true,
             },
             registration_number: {
                 type: DataTypes.STRING(128),

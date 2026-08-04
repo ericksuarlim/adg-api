@@ -10,6 +10,62 @@ const TENANT_DDL_PATCHES: string[] = [
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_animals_ranch_chip_number
        ON animals (ranch_uuid, chip_number)
        WHERE chip_number IS NOT NULL AND btrim(chip_number) <> '';`,
+    `ALTER TABLE IF EXISTS animal_work_session
+       ADD COLUMN IF NOT EXISTS uuid_corral_work_session UUID;`,
+    `ALTER TABLE IF EXISTS animal_work_session
+       ADD COLUMN IF NOT EXISTS medicine_uuid UUID;`,
+    `DO $$
+     BEGIN
+       IF EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'animal_work_session'
+           AND column_name = 'work_session_id'
+       ) AND EXISTS (
+         SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'animal_work_session'
+           AND column_name = 'uuid_corral_work_session'
+       ) THEN
+         UPDATE animal_work_session
+         SET uuid_corral_work_session = work_session_id::uuid
+         WHERE uuid_corral_work_session IS NULL
+           AND work_session_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+         ALTER TABLE animal_work_session DROP COLUMN IF EXISTS work_session_id;
+       END IF;
+     END $$;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_animal_work_session_corral_animal
+       ON animal_work_session (uuid_corral_work_session, uuid_animal)
+       WHERE is_active = true AND uuid_corral_work_session IS NOT NULL;`,
+    `ALTER TABLE IF EXISTS corral_work_sessions
+       ADD COLUMN IF NOT EXISTS responsible_person VARCHAR(256);`,
+    `ALTER TABLE IF EXISTS corral_work_sessions
+       ALTER COLUMN paddock_uuid DROP NOT NULL;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_corral_session_animals_session_animal
+       ON corral_session_animals (uuid_corral_work_session, animal_uuid)
+       WHERE is_active = true;`,
+    `DO $$
+     BEGIN
+       PERFORM pg_advisory_xact_lock(hashtext('ddl:uq_corral_activity_records_step_animal_activity'));
+       DROP INDEX IF EXISTS uq_corral_activity_records_step_animal_activity;
+       IF NOT EXISTS (
+         SELECT 1 FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND indexname = 'uq_corral_activity_records_step_animal_activity'
+       ) THEN
+         CREATE UNIQUE INDEX uq_corral_activity_records_step_animal_activity
+           ON corral_activity_records (uuid_corral_session_step, animal_uuid, activity_code)
+           WHERE is_active = true
+             AND activity_code NOT IN ('VACCINATION', 'DEWORMING');
+       END IF;
+     END $$;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS uq_corral_step_animals_step_animal
+       ON corral_step_animals (uuid_corral_session_step, animal_uuid)
+       WHERE is_active = true;`,
+    `ALTER TABLE IF EXISTS corral_session_steps
+       ADD COLUMN IF NOT EXISTS work_mode VARCHAR(32) NOT NULL DEFAULT 'PRELOADED_SEARCH';`,
+    `ALTER TABLE IF EXISTS animals ALTER COLUMN breed_code DROP NOT NULL;`,
+    `ALTER TABLE IF EXISTS animals ALTER COLUMN breed_code DROP DEFAULT;`,
 ];
 
 async function animalsBirthDateColumnExists(sequelize: Sequelize): Promise<boolean> {

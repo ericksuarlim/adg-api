@@ -4,10 +4,10 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "npx ts-node-dev --respawn --transpile-only src/server.ts",
-    "dev:debug": "npx ts-node-dev --respawn --transpile-only --inspect=0.0.0.0:9230 src/server.ts",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev:debug": "ts-node-dev --respawn --transpile-only --inspect=0.0.0.0:9230 src/server.ts",
     "build": "tsc",
-    "seed:saas-owner": "npx ts-node --transpile-only -r dotenv/config src/scripts/seed-saas-owner.ts",
+    "seed:saas-owner": "npx ts-node --transpile-only -r dotenv/config -e \"require('./src/bootstrap/seed-saas-owner').seedSaasOwnerIfNeeded().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); })\"",
     "start": "node dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -41,6 +41,9 @@
     "@types/node": "^20.4.2",
     "@types/node-schedule": "^2.1.0",
     "@types/pg": "^8.6.6",
-    "@types/sequelize": "4.28.14"
+    "@types/sequelize": "4.28.14",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.3"
   }
 }

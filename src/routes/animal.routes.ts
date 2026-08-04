@@ -9,8 +9,18 @@ animalRoutes.get("/breeds", authorize(Permission.ANIMAL_READ), container.animalC
 animalRoutes.get("/parents", authorize(Permission.ANIMAL_READ), container.animalController.listParentCandidates);
 animalRoutes.get("/", authorize(Permission.ANIMAL_READ), container.animalController.getAnimals);
 animalRoutes.post("/batch", authorize(Permission.ANIMAL_WRITE), container.animalController.createBatch);
+animalRoutes.post(
+    "/deactivate/batch",
+    authorize(Permission.ANIMAL_WRITE),
+    container.animalController.deactivateAnimalsBatch
+);
 animalRoutes.post("/", authorize(Permission.ANIMAL_WRITE), container.animalController.createAnimal);
 animalRoutes.get("/:uuid_animal", authorize(Permission.ANIMAL_READ), container.animalController.getAnimal);
+animalRoutes.post(
+    "/:uuid_animal/deactivate",
+    authorize(Permission.ANIMAL_WRITE),
+    container.animalController.deactivateAnimal
+);
 animalRoutes.put("/:uuid_animal", authorize(Permission.ANIMAL_WRITE), container.animalController.updateAnimal);
 animalRoutes.delete("/:uuid_animal", authorize(Permission.ANIMAL_WRITE), container.animalController.deleteAnimal);
 

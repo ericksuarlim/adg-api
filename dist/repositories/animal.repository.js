@@ -3,6 +3,23 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const sequelize_1 = require("sequelize");
 const tenant_request_context_1 = require("../database/tenant/tenant-request-context");
 const search_where_util_1 = require("../utils/search-where.util");
+const ANIMAL_SORT_COLUMNS = {
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    registrationNumber: 'registration_number',
+    birthDate: 'birth_date',
+    breedCode: 'breed_code',
+    created_at: 'created_at',
+    updated_at: 'updated_at',
+    registration_number: 'registration_number',
+    birth_date: 'birth_date',
+    breed_code: 'breed_code',
+    sex: 'sex',
+    color: 'color',
+};
+function resolveAnimalSortColumn(sortBy) {
+    return ANIMAL_SORT_COLUMNS[sortBy] ?? 'created_at';
+}
 class AnimalRepository {
     async findAll(params) {
         const { AnimalModel, RanchModel } = (0, tenant_request_context_1.requireTenantModels)();
@@ -48,7 +65,8 @@ class AnimalRepository {
             include,
             offset,
             limit: size,
-            order: [[sortBy, order]],
+            order: [[resolveAnimalSortColumn(sortBy), order]],
+            distinct: needsRanchJoin,
         });
     }
     async findById(params) {
@@ -118,6 +136,38 @@ class AnimalRepository {
             return false;
         }
         const [count] = await AnimalModel.update({ is_active: false }, { where: { animal_uuid, is_active: true } });
+        return count > 0;
+    }
+    async markInactiveWithStatus(animal_uuid, current_status, options) {
+        const { AnimalModel, RanchModel } = (0, tenant_request_context_1.requireTenantModels)();
+        let canUpdate = true;
+        if (options?.uuid_company || options?.uuid_ranch_in?.length) {
+            const current = await AnimalModel.findOne({ where: { animal_uuid, is_active: true } });
+            if (current) {
+                const plain = current.get({ plain: true });
+                if (options.uuid_ranch_in?.length && !options.uuid_ranch_in.includes(plain.ranch_uuid)) {
+                    canUpdate = false;
+                }
+                else {
+                    const ranchWhere = {
+                        uuid_ranch: plain.ranch_uuid,
+                        is_active: true,
+                    };
+                    if (options.uuid_company) {
+                        ranchWhere.uuid_company = options.uuid_company;
+                    }
+                    const ranch = await RanchModel.findOne({ where: ranchWhere });
+                    canUpdate = Boolean(ranch);
+                }
+            }
+            else {
+                canUpdate = false;
+            }
+        }
+        if (!canUpdate) {
+            return false;
+        }
+        const [count] = await AnimalModel.update({ is_active: false, current_status }, { where: { animal_uuid, is_active: true } });
         return count > 0;
     }
     async countActiveByCompany(uuid_company) {

@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.envConfig = void 0;
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
+const isDisabled = (value) => value === 'false' || value === '0' || value === 'no';
 exports.envConfig = {
     NODE_ENV: process.env.NODE_ENV || 'development',
     DB_USER: process.env.DB_USER || '',
@@ -23,4 +24,13 @@ exports.envConfig = {
      * Use only in trusted dev/staging; prefer scripts/saas-tenant-rollout-ddl.sql in production.
      */
     DB_SYNC_ALTER: process.env.DB_SYNC_ALTER === 'true' || process.env.DB_SYNC_ALTER === '1',
+    /** Idempotent bootstrap: create initial saas_owner when none exists. */
+    SEED_SAAS_OWNER_ENABLED: !isDisabled(process.env.SEED_SAAS_OWNER_ENABLED),
+    SEED_SAAS_COMPANY_NAME: process.env.SEED_SAAS_COMPANY_NAME?.trim() || 'Demo SaaS',
+    SEED_SAAS_OWNER_EMAIL: process.env.SEED_SAAS_OWNER_EMAIL?.trim() || 'saas@test.com',
+    SEED_SAAS_OWNER_USERNAME: process.env.SEED_SAAS_OWNER_USERNAME?.trim() || 'saas.owner',
+    SEED_SAAS_OWNER_PASSWORD: process.env.SEED_SAAS_OWNER_PASSWORD || 'Demo123!',
+    SEED_SAAS_OWNER_FIRST_NAME: process.env.SEED_SAAS_OWNER_FIRST_NAME?.trim() || 'SaaS',
+    SEED_SAAS_OWNER_LAST_NAME: process.env.SEED_SAAS_OWNER_LAST_NAME?.trim() || 'Admin',
+    SEED_SAAS_OWNER_ID_CARD: process.env.SEED_SAAS_OWNER_ID_CARD?.trim() || '0000000000',
 };

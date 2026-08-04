@@ -11,6 +11,22 @@ import ApiError from "../errors/apiError";
 import HttpStatusCodes from "../errors/httpStatusCodes";
 import { IBaseParams } from "../interfaces/params/query.interface";
 import AnimalRepository from "../repositories/animal.repository";
+import AnimalDisposalRepository from "../repositories/animal-disposal.repository";
+import {
+    ANIMAL_EXIT_TYPES,
+    AnimalExitType,
+    exitTypeToCurrentStatus,
+    isAnimalExitType,
+} from "../constants/animal-exit.constants";
+import {
+    AnimalDeactivateBatchRequestBody,
+    AnimalDeactivateBatchResult,
+    AnimalDeactivateBatchRowResult,
+    AnimalDeactivateRequestBody,
+    AnimalDeactivateResult,
+    AnimalListItemWithExit,
+} from "../interfaces/animal/animal-exit.interface";
+import { AnimalDisposalAttributes } from "../interfaces/animal/animal-operations.interface";
 import { CompanyAttributes, CompanyCreationAttributes } from "../interfaces/company/company.interface";
 import { normalizeCompanyPlanType, PLAN_HEAD_LIMIT } from "../constants/subscription.constants";
 import { isValidCattleBreedCode } from "../constants/cattle-breed.constants";
@@ -27,6 +43,7 @@ export type AnimalCreateContext = {
 
 /** Max rows per batch request (aligned with UI grid cap). */
 const ANIMAL_BATCH_MAX_ROWS = 500;
+const ANIMAL_DEACTIVATE_BATCH_MAX = 500;
 
 type RanchRow = Model<RanchAttributes, RanchCreationAttributes>;
 
@@ -45,6 +62,7 @@ type BatchDuplicateKeys = {
 class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCreationAttributes> {
 
     private readonly animalRepository: AnimalRepository;
+    private readonly animalDisposalRepository: AnimalDisposalRepository;
     private readonly companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>;
     private readonly paddockRepository: PaddockRepository;
     private readonly ownerRepository: OwnerRepository;
@@ -54,8 +72,10 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         companyService: IBaseServiceInterface<CompanyAttributes, CompanyCreationAttributes>,
         paddockRepository?: PaddockRepository,
         ownerRepository?: OwnerRepository,
+        animalDisposalRepository?: AnimalDisposalRepository,
     ) {
         this.animalRepository = animalRepository;
+        this.animalDisposalRepository = animalDisposalRepository ?? new AnimalDisposalRepository();
         this.companyService = companyService;
         this.paddockRepository = paddockRepository ?? new PaddockRepository();
         this.ownerRepository = ownerRepository ?? new OwnerRepository();
@@ -125,7 +145,7 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         ranchUuid: string,
         registrationRaw: string,
         expectedSex: AnimalSex
-    ): Promise<string> {
+    ): Promise<string | null> {
         const registration_number = registrationRaw.trim();
         if (!registration_number) {
             throw new ApiError({
@@ -134,19 +154,11 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
                 description: `Parent registration number is empty (${expectedSex})`
             });
         }
-        const parentUuid = await this.animalRepository.findActiveUuidByRanchRegistrationAndSex(
+        return this.animalRepository.findActiveUuidByRanchRegistrationAndSex(
             ranchUuid,
             registration_number,
             expectedSex
         );
-        if (!parentUuid) {
-            throw new ApiError({
-                name: 'ValidationError',
-                statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: `No ${expectedSex} animal found with registration "${registration_number}" in this ranch`
-            });
-        }
-        return parentUuid;
     }
 
     /**
@@ -255,12 +267,26 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         }
     }
 
-    async getAll(params: IBaseParams): Promise<ServiceResponse<AnimalAttributes[]>> {
+    async getAll(params: IBaseParams): Promise<ServiceResponse<AnimalListItemWithExit[]>> {
         const { rows, count } = await this.animalRepository.findAll(params);
-        const plainAnimals = rows.map((animal: Model<AnimalAttributes, AnimalCreationAttributes>) => animal.get({ plain: true }));
+        const plainAnimals = rows.map((animal: Model<AnimalAttributes, AnimalCreationAttributes>) =>
+            animal.get({ plain: true })
+        ) as AnimalListItemWithExit[];
+
+        let data: AnimalListItemWithExit[] = plainAnimals;
+        if (params.status === 'inactive' && plainAnimals.length > 0) {
+            const disposalMap = await this.animalDisposalRepository.findLatestByAnimalUuids(
+                plainAnimals.map((a) => a.animal_uuid)
+            );
+            data = plainAnimals.map((animal) => ({
+                ...animal,
+                last_exit: this.mapDisposalToLastExit(disposalMap.get(animal.animal_uuid)),
+            }));
+        }
+
         return {
             success: true,
-            data: plainAnimals,
+            data,
             pagination: {
                 totalItems: count,
                 totalPages: Math.ceil(count / params.size),
@@ -496,12 +522,13 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        const breed_code = (body.breed_code ?? '').trim();
-        if (!isValidCattleBreedCode(breed_code)) {
+        const breedRaw = body.breed_code == null ? '' : String(body.breed_code).trim();
+        const breed_code = breedRaw === '' ? null : breedRaw;
+        if (breed_code !== null && !isValidCattleBreedCode(breed_code)) {
             throw new ApiError({
                 name: 'ValidationError',
                 statusCode: HttpStatusCodes.BAD_REQUEST,
-                description: 'Invalid or missing breed_code',
+                description: 'Invalid breed_code',
             });
         }
 
@@ -608,7 +635,235 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
             });
         }
 
-        return { success: true, data: animal.get({ plain: true }) };
+        const plain = animal.get({ plain: true }) as AnimalListItemWithExit;
+        if (includeInactive) {
+            const disposalMap = await this.animalDisposalRepository.findLatestByAnimalUuids([plain.animal_uuid]);
+            plain.last_exit = this.mapDisposalToLastExit(disposalMap.get(plain.animal_uuid));
+        }
+
+        return { success: true, data: plain };
+    }
+
+    async deactivateWithExit(
+        animalUuid: string,
+        body: AnimalDeactivateRequestBody,
+        tenantContext?: { uuid_company?: string; uuid_ranch_in?: string[] }
+    ): Promise<ServiceResponse<AnimalDeactivateResult>> {
+        const validated = this.validateDeactivateBody(body);
+        const current = await this.animalRepository.findById({
+            id: animalUuid,
+            includeInactive: false,
+            uuid_company: tenantContext?.uuid_company,
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        });
+        if (!current) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Animal not found or already inactive',
+            });
+        }
+
+        const plain = current.get({ plain: true }) as AnimalAttributes;
+        const currentStatus = exitTypeToCurrentStatus(validated.exit_type);
+
+        const disposalRow = await this.animalDisposalRepository.create({
+            animal_uuid: animalUuid,
+            disposal_date: validated.exit_date,
+            disposal_type: validated.exit_type,
+            reason: validated.reason,
+            description: validated.description,
+            is_active: true,
+        });
+
+        const marked = await this.animalRepository.markInactiveWithStatus(
+            animalUuid,
+            currentStatus,
+            tenantContext
+        );
+        if (!marked) {
+            throw new ApiError({
+                name: 'NotFound',
+                statusCode: HttpStatusCodes.NOT_FOUND,
+                description: 'Animal not found or already inactive',
+            });
+        }
+
+        const updated = await this.animalRepository.findById({
+            id: animalUuid,
+            includeInactive: true,
+            uuid_company: tenantContext?.uuid_company,
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        });
+
+        return {
+            success: true,
+            data: {
+                animal: (updated?.get({ plain: true }) ?? {
+                    ...plain,
+                    is_active: false,
+                    current_status: currentStatus,
+                }) as AnimalAttributes,
+                disposal: disposalRow.get({ plain: true }) as AnimalDisposalAttributes,
+            },
+        };
+    }
+
+    async deactivateBatchWithExit(
+        body: AnimalDeactivateBatchRequestBody,
+        tenantContext?: { uuid_company?: string; uuid_ranch_in?: string[] }
+    ): Promise<ServiceResponse<AnimalDeactivateBatchResult>> {
+        const inputRows = Array.isArray(body?.rows) ? body.rows : [];
+        if (inputRows.length === 0) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'rows array is required and must not be empty',
+            });
+        }
+        if (inputRows.length > ANIMAL_DEACTIVATE_BATCH_MAX) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `Batch cannot exceed ${ANIMAL_DEACTIVATE_BATCH_MAX} animals`,
+            });
+        }
+
+        const seenUuids = new Set<string>();
+        const rows: AnimalDeactivateBatchRowResult[] = [];
+        let success = 0;
+        let failed = 0;
+
+        for (const row of inputRows) {
+            const animalUuid = String(row?.animal_uuid ?? '').trim();
+            if (!animalUuid) {
+                failed += 1;
+                rows.push({ animal_uuid: '', success: false, error: 'animal_uuid is required' });
+                continue;
+            }
+            if (seenUuids.has(animalUuid)) {
+                failed += 1;
+                rows.push({ animal_uuid: animalUuid, success: false, error: 'Duplicate animal_uuid in batch' });
+                continue;
+            }
+            seenUuids.add(animalUuid);
+
+            try {
+                const validated = this.validateDeactivateBody(row);
+                await this.deactivateWithExit(
+                    animalUuid,
+                    {
+                        exit_type: validated.exit_type,
+                        exit_date: validated.exit_date.toISOString().slice(0, 10),
+                        reason: validated.reason,
+                        description: validated.description,
+                    },
+                    tenantContext
+                );
+                rows.push({ animal_uuid: animalUuid, success: true });
+                success += 1;
+            } catch (err) {
+                failed += 1;
+                const message = err instanceof ApiError ? err.description : 'Deactivate failed';
+                rows.push({ animal_uuid: animalUuid, success: false, error: message });
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                requested: inputRows.length,
+                success,
+                failed,
+                rows,
+            },
+        };
+    }
+
+    private validateDeactivateBody(body: AnimalDeactivateRequestBody): {
+        exit_type: AnimalExitType;
+        exit_date: Date;
+        reason: string | null;
+        description: string | null;
+    } {
+        const exitRaw = typeof body?.exit_type === 'string' ? body.exit_type.trim().toUpperCase() : '';
+        if (!isAnimalExitType(exitRaw)) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: `exit_type must be one of: ${ANIMAL_EXIT_TYPES.join(', ')}`,
+            });
+        }
+
+        const exit_date = this.parseExitDate(body?.exit_date);
+        const reason = typeof body?.reason === 'string' && body.reason.trim() ? body.reason.trim() : null;
+        const description =
+            typeof body?.description === 'string' && body.description.trim() ? body.description.trim() : null;
+
+        return { exit_type: exitRaw, exit_date, reason, description };
+    }
+
+    private parseExitDate(raw: unknown): Date {
+        if (raw === null || raw === undefined) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'exit_date is required',
+            });
+        }
+        if (raw instanceof Date) {
+            if (Number.isNaN(raw.getTime())) {
+                throw new ApiError({
+                    name: 'ValidationError',
+                    statusCode: HttpStatusCodes.BAD_REQUEST,
+                    description: 'Invalid exit_date',
+                });
+            }
+            return raw;
+        }
+        const s0 = String(raw).trim();
+        if (!s0) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'exit_date is required',
+            });
+        }
+        const s = /^\d{4}-\d{2}-\d{2}T/.test(s0) ? s0.slice(0, 10) : s0;
+        const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/;
+        const m = isoDate.exec(s);
+        if (!m) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'exit_date must be YYYY-MM-DD',
+            });
+        }
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const da = Number(m[3]);
+        const utc = new Date(Date.UTC(y, mo - 1, da));
+        if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== mo - 1 || utc.getUTCDate() !== da) {
+            throw new ApiError({
+                name: 'ValidationError',
+                statusCode: HttpStatusCodes.BAD_REQUEST,
+                description: 'Invalid exit_date',
+            });
+        }
+        return utc;
+    }
+
+    private mapDisposalToLastExit(disposal?: AnimalDisposalAttributes): AnimalListItemWithExit['last_exit'] {
+        if (!disposal) {
+            return null;
+        }
+        return {
+            disposal_uuid: disposal.animal_disposal_uuid,
+            exit_type: disposal.disposal_type,
+            exit_date: disposal.disposal_date,
+            reason: disposal.reason ?? null,
+            description: disposal.description ?? null,
+        };
     }
 
     async update(
@@ -653,9 +908,9 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
         const nextRanch = body.ranch_uuid ?? currentAttrs.ranch_uuid;
         await this.validateRanchBelongsToCompany(nextRanch, effectiveTenant);
 
-        if (body.breed_code !== undefined && body.breed_code !== null) {
-            const bc = String(body.breed_code).trim();
-            if (!isValidCattleBreedCode(bc)) {
+        if (body.breed_code !== undefined) {
+            const bc = body.breed_code == null ? '' : String(body.breed_code).trim();
+            if (bc !== '' && !isValidCattleBreedCode(bc)) {
                 throw new ApiError({
                     name: 'ValidationError',
                     statusCode: HttpStatusCodes.BAD_REQUEST,
@@ -735,7 +990,11 @@ class AnimalService implements IBaseServiceInterface<AnimalAttributes, AnimalCre
 
         const merged: AnimalCreationAttributes = {
             ranch_uuid: body.ranch_uuid ?? plain.ranch_uuid,
-            breed_code: body.breed_code ?? plain.breed_code,
+            breed_code: body.breed_code !== undefined
+                ? (body.breed_code == null || String(body.breed_code).trim() === ''
+                    ? null
+                    : String(body.breed_code).trim())
+                : plain.breed_code,
             registration_number: body.registration_number ?? plain.registration_number,
             chip_number,
             mother_animal_uuid,

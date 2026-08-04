@@ -10,12 +10,13 @@ export function createAnimalWorkSessionModel(
     class AnimalWorkSessionModel extends Model<AnimalWorkSessionAttributes, AnimalWorkSessionCreationAttributes>
         implements AnimalWorkSessionAttributes {
         declare id_animal_work: number;
+        declare uuid_corral_work_session: string;
         declare uuid_animal: string;
-        declare work_session_id: string;
         declare attended: boolean;
         declare condition: string;
         declare observation: string;
         declare received_medical: boolean;
+        declare medicine_uuid?: string | null;
         declare created_at: Date;
         declare is_active: boolean;
     }
@@ -27,12 +28,12 @@ export function createAnimalWorkSessionModel(
                 primaryKey: true,
                 autoIncrement: true,
             },
-            uuid_animal: {
-                type: DataTypes.STRING,
+            uuid_corral_work_session: {
+                type: DataTypes.UUID,
                 allowNull: false,
             },
-            work_session_id: {
-                type: DataTypes.STRING,
+            uuid_animal: {
+                type: DataTypes.UUID,
                 allowNull: false,
             },
             attended: {
@@ -43,6 +44,7 @@ export function createAnimalWorkSessionModel(
             condition: {
                 type: DataTypes.STRING(100),
                 allowNull: false,
+                defaultValue: '',
             },
             observation: {
                 type: DataTypes.TEXT,
@@ -52,6 +54,10 @@ export function createAnimalWorkSessionModel(
                 type: DataTypes.BOOLEAN,
                 allowNull: false,
                 defaultValue: false,
+            },
+            medicine_uuid: {
+                type: DataTypes.UUID,
+                allowNull: true,
             },
             created_at: {
                 type: DataTypes.DATE,

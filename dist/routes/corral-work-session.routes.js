@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const container_1 = require("../containers/container");
+const authorization_middleware_1 = require("../middlewares/authorization.middleware");
+const authorization_constants_1 = require("../constants/authorization.constants");
+const corralWorkSessionRoutes = (0, express_1.Router)({ mergeParams: true });
+corralWorkSessionRoutes.get('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.corralWorkSessionController.getAll);
+corralWorkSessionRoutes.post('/', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.corralWorkSessionController.create);
+corralWorkSessionRoutes.get('/:uuid_corral_work_session/workspace', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.corralWorkSessionController.getWorkspace);
+corralWorkSessionRoutes.get('/:uuid_corral_work_session/lookup-animal', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.corralWorkSessionController.lookupAnimal);
+corralWorkSessionRoutes.post('/:uuid_corral_work_session/findings', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.corralWorkSessionController.upsertFinding);
+corralWorkSessionRoutes.put('/:uuid_corral_work_session/steps/:uuid_corral_session_step/grid', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.corralWorkSessionController.saveStepGrid);
+corralWorkSessionRoutes.post('/:uuid_corral_work_session/start', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.corralWorkSessionController.start);
+corralWorkSessionRoutes.post('/:uuid_corral_work_session/close', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_WRITE), container_1.container.corralWorkSessionController.close);
+corralWorkSessionRoutes.get('/:uuid_corral_work_session', (0, authorization_middleware_1.authorize)(authorization_constants_1.Permission.ANIMAL_WORK_SESSION_READ), container_1.container.corralWorkSessionController.getById);
+exports.default = corralWorkSessionRoutes;

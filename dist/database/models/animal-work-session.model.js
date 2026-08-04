@@ -11,12 +11,12 @@ function createAnimalWorkSessionModel(sequelize) {
             primaryKey: true,
             autoIncrement: true,
         },
-        uuid_animal: {
-            type: sequelize_1.DataTypes.STRING,
+        uuid_corral_work_session: {
+            type: sequelize_1.DataTypes.UUID,
             allowNull: false,
         },
-        work_session_id: {
-            type: sequelize_1.DataTypes.STRING,
+        uuid_animal: {
+            type: sequelize_1.DataTypes.UUID,
             allowNull: false,
         },
         attended: {
@@ -27,6 +27,7 @@ function createAnimalWorkSessionModel(sequelize) {
         condition: {
             type: sequelize_1.DataTypes.STRING(100),
             allowNull: false,
+            defaultValue: '',
         },
         observation: {
             type: sequelize_1.DataTypes.TEXT,
@@ -36,6 +37,10 @@ function createAnimalWorkSessionModel(sequelize) {
             type: sequelize_1.DataTypes.BOOLEAN,
             allowNull: false,
             defaultValue: false,
+        },
+        medicine_uuid: {
+            type: sequelize_1.DataTypes.UUID,
+            allowNull: true,
         },
         created_at: {
             type: sequelize_1.DataTypes.DATE,

@@ -5,7 +5,16 @@ import { AnimalBatchCreateRequestBody } from "../interfaces/animal/animal-batch.
 import { handleResponse } from "../utils/response.handler";
 import { buildGetAllParams, buildGetByIdParams } from "../utils/query.builder";
 import { IncludeInactiveQuery } from "../interfaces/params/query.interface";
-import { IDeleteAnimalParams, IGetAnimalParams, IUpdateAnimalParams } from "../interfaces/params/animalParams.interface";
+import {
+    IDeactivateAnimalParams,
+    IDeleteAnimalParams,
+    IGetAnimalParams,
+    IUpdateAnimalParams,
+} from "../interfaces/params/animalParams.interface";
+import {
+    AnimalDeactivateBatchRequestBody,
+    AnimalDeactivateRequestBody,
+} from "../interfaces/animal/animal-exit.interface";
 import { AuthRequest } from "../interfaces/middleware/auth-middleware.interface";
 import { UserRole } from "../interfaces/roles/roles.interface";
 import { assertRanchTokenAccess, ranchFilterFromUser } from "../helpers/access-scope.helper";
@@ -193,6 +202,49 @@ class AnimalController {
 
             const response = await this.animalService.update(uuid_animal, animalBody as AnimalCreationAttributes, tenant);
             return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    deactivateAnimal = async (
+        req: AuthRequest & Request<IDeactivateAnimalParams>,
+        res: Response,
+        next: NextFunction
+    ) => {
+        try {
+            const { uuid_animal } = req.params;
+            const body = req.body as AnimalDeactivateRequestBody;
+            const tenant = this.animalTenant(req);
+
+            const existing = await this.animalService.getById({
+                id: uuid_animal,
+                includeInactive: false,
+                uuid_company: tenant.uuid_company,
+                uuid_ranch_in: tenant.uuid_ranch_in,
+            });
+            assertRanchTokenAccess(req.user, existing.data!.ranch_uuid);
+
+            const response = await this.animalService.deactivateWithExit(uuid_animal, body, {
+                uuid_company: tenant.uuid_company,
+                uuid_ranch_in: tenant.uuid_ranch_in,
+            });
+            return handleResponse(res, response);
+        } catch (error) {
+            next(error);
+        }
+    };
+
+    deactivateAnimalsBatch = async (req: AuthRequest, res: Response, next: NextFunction) => {
+        try {
+            const body = req.body as AnimalDeactivateBatchRequestBody;
+            const tenant = this.animalTenant(req);
+            const response = await this.animalService.deactivateBatchWithExit(body, {
+                uuid_company: tenant.uuid_company,
+                uuid_ranch_in: tenant.uuid_ranch_in,
+            });
+            const status = response.data && response.data.failed > 0 && response.data.success > 0 ? 207 : 200;
+            return handleResponse(res, response, status);
         } catch (error) {
             next(error);
         }

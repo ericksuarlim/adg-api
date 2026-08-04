@@ -2,6 +2,7 @@ import app from './app';
 import saasSequelize from './database/saas-sequelize';
 import {envConfig} from "./config";
 import './database/saas-models.register';
+import { seedSaasOwnerIfNeeded } from './bootstrap/seed-saas-owner';
 
 process.on('uncaughtException', (err) => {
     console.error('uncaughtException:', err);
@@ -19,6 +20,7 @@ saasSequelize.authenticate()
         }
         return saasSequelize.sync({ alter: syncAlter });
     })
+    .then(() => seedSaasOwnerIfNeeded())
     .then(() => {
         const port = Number(envConfig.PORT) || 3010;
         app.listen(port, '0.0.0.0', () => {

@@ -1,24 +1,9 @@
--- Seed mínimo: compañía CattlePro + usuario saas_owner (rol en `users.role`, BD SaaS).
--- Ejecutar DESPUÉS de que existan las tablas (arranca la API una vez con sync, o aplica DDL SaaS).
+-- Legacy manual seed (optional). Prefer automatic seed on API startup from `.env`:
+--   SEED_SAAS_OWNER_* / SEED_SAAS_COMPANY_NAME (see `.env.example`).
 --
--- === Cómo ejecutarlo (elige una) ===
---
--- A) Desde tu Mac, si Postgres está en Docker (puerto host 15433 según .env.example):
---    psql "postgresql://adg-user-postgres:postgres@localhost:15433/adg-db-postgres" -f scripts/seed-saas-admin.sql
---
--- B) Si tu .env usa otro puerto/host/contraseña, copia DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME.
---
--- C) Dentro del contenedor de Postgres (nombre de servicio suele ser "postgres"):
---    docker compose exec -T postgres psql -U adg-user-postgres -d adg-db-postgres < scripts/seed-saas-admin.sql
---    (ejecuta desde la carpeta adg-api donde está docker-compose.yml)
---
--- Si falla por duplicado (email/username ya existen), borra antes las filas de prueba o cambia UUIDs/email en este archivo.
---
--- Credenciales tras el seed:
---   Compañía: CattlePro
---   usuario: erick.suarez
---   contraseña: Erick.suarez1
--- (hash bcrypt generado con: node -e "console.log(require('bcryptjs').hashSync('TU_CLAVE', 10))" en carpeta adg-api)
+-- Run only if you cannot start the API and need SQL-only bootstrap.
+-- Use DB_* from `.env` for connection, e.g.:
+--   psql "postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}" -f scripts/seed-saas-admin.sql
 
 WITH ids AS (
   SELECT
@@ -39,7 +24,7 @@ INSERT INTO companies (
 )
 SELECT
   uuid_company,
-  'CattlePro',
+  'Vrete',
   'ESSENTIAL'::"enum_companies_plan_type",
   'ANNUAL'::"enum_companies_billing_cycle",
   'ACTIVE'::"enum_companies_membership_status",
@@ -75,7 +60,7 @@ SELECT
   '0000000000',
   'Erick',
   'Suarez',
-  'erick.suarez@cattlepro.local',
+  'erick.suarez@vrete.local',
   'erick.suarez',
   '$2b$10$8cSkLMhX9U6HMpJ5tUmVLuZOGPx8gyI6rVss2fRwIFYQikOX9ICpy',
   'saas_owner',

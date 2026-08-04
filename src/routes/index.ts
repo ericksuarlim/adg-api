@@ -3,6 +3,7 @@ import userRoutes from "./user.routes";
 import companyRoutes from "./company.routes";
 import animalRoutes from "./animal.routes";
 import animalWorkSessionRoutes from "./animal-work-session.routes";
+import corralWorkSessionRoutes from "./corral-work-session.routes";
 import authenticationRoutes from "./authentication.routes";
 import ranchRoutes from "./ranch.routes";
 import membershipRoutes from "./membership.routes";
@@ -29,6 +30,7 @@ operationalRouter.use('/animal', animalRoutes);
 operationalRouter.use('/owner', ownerRoutes);
 operationalRouter.use('/paddock', paddockRoutes);
 operationalRouter.use('/animal-work-session', animalWorkSessionRoutes);
+operationalRouter.use('/corral-work-session', corralWorkSessionRoutes);
 operationalRouter.use('/membership', membershipRoutes);
 
 router.use(operationalRouter);

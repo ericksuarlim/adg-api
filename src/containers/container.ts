@@ -13,6 +13,10 @@ import RanchController from "../controllers/ranch.controller";
 import AnimalWorkSessionRepository from "../repositories/animal-work-session.repository";
 import AnimalWorkSessionService from "../services/animal-work-session.service";
 import AnimalWorkSessionController from "../controllers/animal-work-session.controller";
+import CorralSessionRepository from "../repositories/corral-session.repository";
+import CorralSessionHistorySyncService from "../services/corral-session-history-sync.service";
+import CorralWorkSessionService from "../services/corral-work-session.service";
+import CorralWorkSessionController from "../controllers/corral-work-session.controller";
 import AuthenticationRepository from "../repositories/authentication.repository";
 import AuthenticationController from "../controllers/authentication.controller";
 import AuthenticationService from "../services/authentication.service";
@@ -42,6 +46,8 @@ const userRepository = new UserRepository();
 const ranchRepository = new RanchRepository();
 const animalRepository = new AnimalRepository();
 const animalWorkSessionRepository = new AnimalWorkSessionRepository();
+const corralSessionRepository = new CorralSessionRepository();
+const corralSessionHistorySyncService = new CorralSessionHistorySyncService();
 const sessionRepository = new SessionRepository();
 const authenticationRepository = new AuthenticationRepository();
 const membershipRepository = new MembershipRepository();
@@ -59,6 +65,10 @@ const paddockService = new PaddockService(paddockRepository, ranchRepository);
 const ranchService = new RanchService(ranchRepository, paddockRepository);
 const animalService = new AnimalService(animalRepository, companyService);
 const animalWorkSessionService = new AnimalWorkSessionService(animalWorkSessionRepository);
+const corralWorkSessionService = new CorralWorkSessionService(
+    corralSessionRepository,
+    corralSessionHistorySyncService
+);
 const sessionService = new SessionService(sessionRepository);
 const authenticationService = new AuthenticationService(
     authenticationRepository,
@@ -77,6 +87,7 @@ const companyController = new CompanyController(companyService);
 const animalController = new AnimalController(animalService);
 const ranchController = new RanchController(ranchService);
 const animalWorkSessionController = new AnimalWorkSessionController(animalWorkSessionService);
+const corralWorkSessionController = new CorralWorkSessionController(corralWorkSessionService);
 const authenticationController = new AuthenticationController(authenticationService);
 const membershipController = new MembershipController(membershipService);
 const referenceSampleController = new ReferenceSampleController(referenceSampleService);
@@ -92,6 +103,7 @@ export const container = {
     animalController,
     ranchController,
     animalWorkSessionController,
+    corralWorkSessionController,
     authenticationController,
     membershipController,
     referenceSampleController,

@@ -7,6 +7,7 @@ const app_1 = __importDefault(require("./app"));
 const saas_sequelize_1 = __importDefault(require("./database/saas-sequelize"));
 const config_1 = require("./config");
 require("./database/saas-models.register");
+const seed_saas_owner_1 = require("./bootstrap/seed-saas-owner");
 process.on('uncaughtException', (err) => {
     console.error('uncaughtException:', err);
 });
@@ -22,6 +23,7 @@ saas_sequelize_1.default.authenticate()
     }
     return saas_sequelize_1.default.sync({ alter: syncAlter });
 })
+    .then(() => (0, seed_saas_owner_1.seedSaasOwnerIfNeeded)())
     .then(() => {
     const port = Number(config_1.envConfig.PORT) || 3010;
     app_1.default.listen(port, '0.0.0.0', () => {

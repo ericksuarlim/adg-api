@@ -13,6 +13,8 @@ type PoolEntry = {
 
 const pool = new Map<string, PoolEntry>();
 const accessOrder: string[] = [];
+/** Dedupes concurrent first-time tenant DB init (schema sync + DDL patches). */
+const initPromises = new Map<string, Promise<PoolEntry>>();
 
 function maxPoolSize(): number {
     const raw = envConfig.TENANT_POOL_MAX;
@@ -48,14 +50,7 @@ async function evictIfNeeded(): Promise<void> {
 /**
  * LRU-ish pool of Sequelize instances keyed by tenant PostgreSQL database name.
  */
-export async function getTenantPoolEntry(databaseName: string): Promise<PoolEntry> {
-    const existing = pool.get(databaseName);
-    if (existing) {
-        existing.lastUsed = Date.now();
-        touchOrder(databaseName);
-        return existing;
-    }
-
+async function createTenantPoolEntry(databaseName: string): Promise<PoolEntry> {
     await evictIfNeeded();
 
     const sequelize = new Sequelize(databaseName, dbConfig.user as string, dbConfig.password as string, {
@@ -72,6 +67,37 @@ export async function getTenantPoolEntry(databaseName: string): Promise<PoolEntr
     pool.set(databaseName, entry);
     touchOrder(databaseName);
     return entry;
+}
+
+export async function getTenantPoolEntry(databaseName: string): Promise<PoolEntry> {
+    const existing = pool.get(databaseName);
+    if (existing) {
+        existing.lastUsed = Date.now();
+        touchOrder(databaseName);
+        return existing;
+    }
+
+    const inFlight = initPromises.get(databaseName);
+    if (inFlight) {
+        return inFlight;
+    }
+
+    const initPromise = (async (): Promise<PoolEntry> => {
+        const cached = pool.get(databaseName);
+        if (cached) {
+            cached.lastUsed = Date.now();
+            touchOrder(databaseName);
+            return cached;
+        }
+        return createTenantPoolEntry(databaseName);
+    })();
+
+    initPromises.set(databaseName, initPromise);
+    try {
+        return await initPromise;
+    } finally {
+        initPromises.delete(databaseName);
+    }
 }
 
 export async function closeAllTenantPoolConnections(): Promise<void> {

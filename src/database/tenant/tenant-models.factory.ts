@@ -3,6 +3,9 @@ import { createRanchModel } from '../models/ranch.model';
 import { createAnimalModel } from '../models/animal.model';
 import { createAnimalLegacyModel } from '../models/animal-legacy.model';
 import { createAnimalWorkSessionModel } from '../models/animal-work-session.model';
+import { createCorralWorkSessionModel } from '../models/corral-work-session.model';
+import { createWorkSessionPlannedActivityModel } from '../models/work-session-planned-activity.model';
+import { createCorralSessionOperationalModels } from '../models/corral-session-operational.models';
 import { createOperationalModels } from '../models/animal-operations.models';
 import { associateTenantDomainModels, TenantDomainModels } from './tenant-domain-associations';
 
@@ -11,12 +14,18 @@ export function buildTenantModelsForSequelize(sequelize: Sequelize): TenantDomai
     const AnimalModel = createAnimalModel(sequelize);
     const AnimalLegacyModel = createAnimalLegacyModel(sequelize);
     const AnimalWorkSessionModel = createAnimalWorkSessionModel(sequelize);
+    const CorralWorkSessionModel = createCorralWorkSessionModel(sequelize);
+    const WorkSessionPlannedActivityModel = createWorkSessionPlannedActivityModel(sequelize);
+    const corralOps = createCorralSessionOperationalModels(sequelize);
     const ops = createOperationalModels(sequelize);
     const merged = {
         RanchModel,
         AnimalModel,
         AnimalLegacyModel,
         AnimalWorkSessionModel,
+        CorralWorkSessionModel,
+        WorkSessionPlannedActivityModel,
+        ...corralOps,
         ...ops,
     };
     associateTenantDomainModels(merged as TenantDomainModels);

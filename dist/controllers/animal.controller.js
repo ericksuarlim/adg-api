@@ -48,6 +48,42 @@ class AnimalController {
                 next(error);
             }
         };
+        this.createBatch = async (req, res, next) => {
+            try {
+                const body = req.body;
+                const rows = body?.rows;
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    throw new apiError_1.default({
+                        name: "ValidationError",
+                        statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                        description: "rows array is required and must not be empty",
+                    });
+                }
+                const ranchIds = new Set();
+                for (const item of rows) {
+                    const ranch = item?.animal?.ranch_uuid;
+                    if (typeof ranch === "string" && ranch.trim()) {
+                        ranchIds.add(ranch.trim());
+                    }
+                }
+                for (const ranchUuid of ranchIds) {
+                    (0, access_scope_helper_1.assertRanchTokenAccess)(req.user, ranchUuid);
+                }
+                const ctx = {
+                    jwtCompanyUuid: req.user?.uuid_company,
+                    isSaasOwner: this.isSaasOwner(req),
+                };
+                const response = await this.animalService.createBatch(rows, ctx);
+                if (!response.success) {
+                    return res.status(response.code ?? 500).json(response);
+                }
+                const status = response.data && response.data.failed > 0 && response.data.created > 0 ? 207 : 201;
+                return (0, response_handler_1.handleResponse)(res, response, status);
+            }
+            catch (error) {
+                next(error);
+            }
+        };
         this.createAnimal = async (req, res, next) => {
             try {
                 const animalBody = req.body;
@@ -119,6 +155,43 @@ class AnimalController {
                 (0, access_scope_helper_1.assertRanchTokenAccess)(req.user, existing.data.ranch_uuid);
                 const response = await this.animalService.update(uuid_animal, animalBody, tenant);
                 return (0, response_handler_1.handleResponse)(res, response);
+            }
+            catch (error) {
+                next(error);
+            }
+        };
+        this.deactivateAnimal = async (req, res, next) => {
+            try {
+                const { uuid_animal } = req.params;
+                const body = req.body;
+                const tenant = this.animalTenant(req);
+                const existing = await this.animalService.getById({
+                    id: uuid_animal,
+                    includeInactive: false,
+                    uuid_company: tenant.uuid_company,
+                    uuid_ranch_in: tenant.uuid_ranch_in,
+                });
+                (0, access_scope_helper_1.assertRanchTokenAccess)(req.user, existing.data.ranch_uuid);
+                const response = await this.animalService.deactivateWithExit(uuid_animal, body, {
+                    uuid_company: tenant.uuid_company,
+                    uuid_ranch_in: tenant.uuid_ranch_in,
+                });
+                return (0, response_handler_1.handleResponse)(res, response);
+            }
+            catch (error) {
+                next(error);
+            }
+        };
+        this.deactivateAnimalsBatch = async (req, res, next) => {
+            try {
+                const body = req.body;
+                const tenant = this.animalTenant(req);
+                const response = await this.animalService.deactivateBatchWithExit(body, {
+                    uuid_company: tenant.uuid_company,
+                    uuid_ranch_in: tenant.uuid_ranch_in,
+                });
+                const status = response.data && response.data.failed > 0 && response.data.success > 0 ? 207 : 200;
+                return (0, response_handler_1.handleResponse)(res, response, status);
             }
             catch (error) {
                 next(error);

@@ -19,6 +19,10 @@ const ranch_controller_1 = __importDefault(require("../controllers/ranch.control
 const animal_work_session_repository_1 = __importDefault(require("../repositories/animal-work-session.repository"));
 const animal_work_session_service_1 = __importDefault(require("../services/animal-work-session.service"));
 const animal_work_session_controller_1 = __importDefault(require("../controllers/animal-work-session.controller"));
+const corral_session_repository_1 = __importDefault(require("../repositories/corral-session.repository"));
+const corral_session_history_sync_service_1 = __importDefault(require("../services/corral-session-history-sync.service"));
+const corral_work_session_service_1 = __importDefault(require("../services/corral-work-session.service"));
+const corral_work_session_controller_1 = __importDefault(require("../controllers/corral-work-session.controller"));
 const authentication_repository_1 = __importDefault(require("../repositories/authentication.repository"));
 const authentication_controller_1 = __importDefault(require("../controllers/authentication.controller"));
 const authentication_service_1 = __importDefault(require("../services/authentication.service"));
@@ -47,6 +51,8 @@ const userRepository = new user_repository_1.default();
 const ranchRepository = new ranch_repository_1.default();
 const animalRepository = new animal_repository_1.default();
 const animalWorkSessionRepository = new animal_work_session_repository_1.default();
+const corralSessionRepository = new corral_session_repository_1.default();
+const corralSessionHistorySyncService = new corral_session_history_sync_service_1.default();
 const sessionRepository = new session_repository_1.default();
 const authenticationRepository = new authentication_repository_1.default();
 const membershipRepository = new membership_repository_1.default();
@@ -64,6 +70,7 @@ const paddockService = new paddock_service_1.default(paddockRepository, ranchRep
 const ranchService = new ranch_service_1.default(ranchRepository, paddockRepository);
 const animalService = new animal_service_1.default(animalRepository, companyService);
 const animalWorkSessionService = new animal_work_session_service_1.default(animalWorkSessionRepository);
+const corralWorkSessionService = new corral_work_session_service_1.default(corralSessionRepository, corralSessionHistorySyncService);
 const sessionService = new session_service_1.default(sessionRepository);
 const authenticationService = new authentication_service_1.default(authenticationRepository, sessionService, userService, membershipRepository);
 const membershipService = new membership_service_1.default(userService, ranchService);
@@ -76,6 +83,7 @@ const companyController = new company_controller_1.default(companyService);
 const animalController = new animal_controller_1.default(animalService);
 const ranchController = new ranch_controller_1.default(ranchService);
 const animalWorkSessionController = new animal_work_session_controller_1.default(animalWorkSessionService);
+const corralWorkSessionController = new corral_work_session_controller_1.default(corralWorkSessionService);
 const authenticationController = new authentication_controller_1.default(authenticationService);
 const membershipController = new membership_controller_1.default(membershipService);
 const referenceSampleController = new reference_sample_controller_1.default(referenceSampleService);
@@ -88,6 +96,7 @@ exports.container = {
     animalController,
     ranchController,
     animalWorkSessionController,
+    corralWorkSessionController,
     authenticationController,
     membershipController,
     referenceSampleController,

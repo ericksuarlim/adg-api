@@ -1,0 +1,89 @@
+import { Router } from 'express';
+import { container } from '../containers/container';
+import { authorize } from '../middlewares/authorization.middleware';
+import { Permission } from '../constants/authorization.constants';
+
+const corralWorkSessionRoutes = Router({ mergeParams: true });
+
+corralWorkSessionRoutes.get(
+    '/',
+    authorize(Permission.ANIMAL_WORK_SESSION_READ),
+    container.corralWorkSessionController.getAll
+);
+corralWorkSessionRoutes.post(
+    '/',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.create
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/configure-work',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.configureWork
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/extend-work',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.extendWorkConfiguration
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/steps/:uuid_corral_session_step/scan-animal',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.scanStepAnimal
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/animals/preview',
+    authorize(Permission.ANIMAL_WORK_SESSION_READ),
+    container.corralWorkSessionController.previewAnimals
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/animals/load',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.loadAnimals
+);
+corralWorkSessionRoutes.patch(
+    '/:uuid_corral_work_session/steps/:uuid_corral_session_step/work-mode',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.updateStepWorkMode
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/steps/:uuid_corral_session_step/append-animals',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.appendAnimalsToStep
+);
+corralWorkSessionRoutes.get(
+    '/:uuid_corral_work_session/workspace',
+    authorize(Permission.ANIMAL_WORK_SESSION_READ),
+    container.corralWorkSessionController.getWorkspace
+);
+corralWorkSessionRoutes.get(
+    '/:uuid_corral_work_session/lookup-animal',
+    authorize(Permission.ANIMAL_WORK_SESSION_READ),
+    container.corralWorkSessionController.lookupAnimal
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/findings',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.upsertFinding
+);
+corralWorkSessionRoutes.put(
+    '/:uuid_corral_work_session/steps/:uuid_corral_session_step/grid',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.saveStepGrid
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/start',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.start
+);
+corralWorkSessionRoutes.post(
+    '/:uuid_corral_work_session/close',
+    authorize(Permission.ANIMAL_WORK_SESSION_WRITE),
+    container.corralWorkSessionController.close
+);
+corralWorkSessionRoutes.get(
+    '/:uuid_corral_work_session',
+    authorize(Permission.ANIMAL_WORK_SESSION_READ),
+    container.corralWorkSessionController.getById
+);
+
+export default corralWorkSessionRoutes;

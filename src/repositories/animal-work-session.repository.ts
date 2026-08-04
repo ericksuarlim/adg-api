@@ -19,10 +19,11 @@ class AnimalWorkSessionRepository implements
             sortBy: string;
             order: 'ASC' | 'DESC';
             status?: Status;
+            uuid_corral_work_session?: string;
         }
     ): Promise<{ rows: AnimalWorkSessionRow[]; count: number }> {
         const { AnimalWorkSessionModel } = requireTenantModels();
-        const { page, size, sortBy, order, status } = params;
+        const { page, size, sortBy, order, status, uuid_corral_work_session } = params;
         const offset = (page - 1) * size;
         const where: Record<string, unknown> = {};
 
@@ -32,11 +33,39 @@ class AnimalWorkSessionRepository implements
             where.is_active = false;
         }
 
+        if (uuid_corral_work_session) {
+            where.uuid_corral_work_session = uuid_corral_work_session;
+        }
+
         return await AnimalWorkSessionModel.findAndCountAll({
             where,
             offset,
             limit: size,
             order: [[sortBy, order]],
+        });
+    }
+
+    async findByCorralSession(uuid_corral_work_session: string): Promise<AnimalWorkSessionRow[]> {
+        const { AnimalWorkSessionModel, AnimalModel } = requireTenantModels();
+        return AnimalWorkSessionModel.findAll({
+            where: { uuid_corral_work_session, is_active: true },
+            include: [{
+                model: AnimalModel,
+                as: 'animal',
+                required: false,
+                attributes: ['registration_number', 'chip_number'],
+            }],
+            order: [['created_at', 'ASC']],
+        });
+    }
+
+    async findBySessionAndAnimal(
+        uuid_corral_work_session: string,
+        uuid_animal: string
+    ): Promise<AnimalWorkSessionRow | null> {
+        const { AnimalWorkSessionModel } = requireTenantModels();
+        return AnimalWorkSessionModel.findOne({
+            where: { uuid_corral_work_session, uuid_animal, is_active: true },
         });
     }
 
@@ -60,7 +89,7 @@ class AnimalWorkSessionRepository implements
 
     async update(
         id_animal_work: string,
-        data: AnimalWorkSessionCreationAttributes,
+        data: Partial<AnimalWorkSessionCreationAttributes>,
         _options?: { uuid_company?: string }
     ): Promise<AnimalWorkSessionRow | null> {
         const { AnimalWorkSessionModel } = requireTenantModels();
@@ -70,6 +99,22 @@ class AnimalWorkSessionRepository implements
         });
 
         if (count === 0) return null;
+        return updated[0];
+    }
+
+    async updateBySessionAndAnimal(
+        uuid_corral_work_session: string,
+        uuid_animal: string,
+        data: Partial<AnimalWorkSessionCreationAttributes>
+    ): Promise<AnimalWorkSessionRow | null> {
+        const { AnimalWorkSessionModel } = requireTenantModels();
+        const [count, updated] = await AnimalWorkSessionModel.update(data, {
+            where: { uuid_corral_work_session, uuid_animal, is_active: true },
+            returning: true,
+        });
+        if (count === 0) {
+            return null;
+        }
         return updated[0];
     }
 

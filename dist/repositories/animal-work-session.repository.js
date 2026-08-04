@@ -4,7 +4,7 @@ const tenant_request_context_1 = require("../database/tenant/tenant-request-cont
 class AnimalWorkSessionRepository {
     async findAll(params) {
         const { AnimalWorkSessionModel } = (0, tenant_request_context_1.requireTenantModels)();
-        const { page, size, sortBy, order, status } = params;
+        const { page, size, sortBy, order, status, uuid_corral_work_session } = params;
         const offset = (page - 1) * size;
         const where = {};
         if (status === 'active') {
@@ -13,11 +13,33 @@ class AnimalWorkSessionRepository {
         else if (status === 'inactive') {
             where.is_active = false;
         }
+        if (uuid_corral_work_session) {
+            where.uuid_corral_work_session = uuid_corral_work_session;
+        }
         return await AnimalWorkSessionModel.findAndCountAll({
             where,
             offset,
             limit: size,
             order: [[sortBy, order]],
+        });
+    }
+    async findByCorralSession(uuid_corral_work_session) {
+        const { AnimalWorkSessionModel, AnimalModel } = (0, tenant_request_context_1.requireTenantModels)();
+        return AnimalWorkSessionModel.findAll({
+            where: { uuid_corral_work_session, is_active: true },
+            include: [{
+                    model: AnimalModel,
+                    as: 'animal',
+                    required: false,
+                    attributes: ['registration_number', 'chip_number'],
+                }],
+            order: [['created_at', 'ASC']],
+        });
+    }
+    async findBySessionAndAnimal(uuid_corral_work_session, uuid_animal) {
+        const { AnimalWorkSessionModel } = (0, tenant_request_context_1.requireTenantModels)();
+        return AnimalWorkSessionModel.findOne({
+            where: { uuid_corral_work_session, uuid_animal, is_active: true },
         });
     }
     async findById(params) {
@@ -41,6 +63,17 @@ class AnimalWorkSessionRepository {
         });
         if (count === 0)
             return null;
+        return updated[0];
+    }
+    async updateBySessionAndAnimal(uuid_corral_work_session, uuid_animal, data) {
+        const { AnimalWorkSessionModel } = (0, tenant_request_context_1.requireTenantModels)();
+        const [count, updated] = await AnimalWorkSessionModel.update(data, {
+            where: { uuid_corral_work_session, uuid_animal, is_active: true },
+            returning: true,
+        });
+        if (count === 0) {
+            return null;
+        }
         return updated[0];
     }
     async delete(id_animal_work, _options) {

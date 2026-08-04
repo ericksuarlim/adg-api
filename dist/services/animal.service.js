@@ -5,14 +5,20 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const apiError_1 = __importDefault(require("../errors/apiError"));
 const httpStatusCodes_1 = __importDefault(require("../errors/httpStatusCodes"));
+const animal_disposal_repository_1 = __importDefault(require("../repositories/animal-disposal.repository"));
+const animal_exit_constants_1 = require("../constants/animal-exit.constants");
 const subscription_constants_1 = require("../constants/subscription.constants");
 const cattle_breed_constants_1 = require("../constants/cattle-breed.constants");
 const paddock_repository_1 = __importDefault(require("../repositories/paddock.repository"));
 const owner_repository_1 = __importDefault(require("../repositories/owner.repository"));
 const tenant_request_context_1 = require("../database/tenant/tenant-request-context");
+/** Max rows per batch request (aligned with UI grid cap). */
+const ANIMAL_BATCH_MAX_ROWS = 500;
+const ANIMAL_DEACTIVATE_BATCH_MAX = 500;
 class AnimalService {
-    constructor(animalRepository, companyService, paddockRepository, ownerRepository) {
+    constructor(animalRepository, companyService, paddockRepository, ownerRepository, animalDisposalRepository) {
         this.animalRepository = animalRepository;
+        this.animalDisposalRepository = animalDisposalRepository ?? new animal_disposal_repository_1.default();
         this.companyService = companyService;
         this.paddockRepository = paddockRepository ?? new paddock_repository_1.default();
         this.ownerRepository = ownerRepository ?? new owner_repository_1.default();
@@ -181,9 +187,17 @@ class AnimalService {
     async getAll(params) {
         const { rows, count } = await this.animalRepository.findAll(params);
         const plainAnimals = rows.map((animal) => animal.get({ plain: true }));
+        let data = plainAnimals;
+        if (params.status === 'inactive' && plainAnimals.length > 0) {
+            const disposalMap = await this.animalDisposalRepository.findLatestByAnimalUuids(plainAnimals.map((a) => a.animal_uuid));
+            data = plainAnimals.map((animal) => ({
+                ...animal,
+                last_exit: this.mapDisposalToLastExit(disposalMap.get(animal.animal_uuid)),
+            }));
+        }
         return {
             success: true,
-            data: plainAnimals,
+            data,
             pagination: {
                 totalItems: count,
                 totalPages: Math.ceil(count / params.size),
@@ -195,30 +209,177 @@ class AnimalService {
     }
     async create(animalBody, createContext) {
         const body = animalBody;
+        const ctx = createContext ?? { isSaasOwner: false };
+        const headBudgets = new Map();
+        const data = await this.persistNewAnimal(body, ctx, headBudgets);
+        return { success: true, data };
+    }
+    /**
+     * Creates many animals in one request. Each row is processed independently:
+     * successes are persisted; failures return per-row errors (partial save).
+     */
+    async createBatch(rows, createContext) {
+        if (!Array.isArray(rows) || rows.length === 0) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'rows array is required and must not be empty',
+            });
+        }
+        if (rows.length > ANIMAL_BATCH_MAX_ROWS) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: `Batch cannot exceed ${ANIMAL_BATCH_MAX_ROWS} rows`,
+            });
+        }
+        const ctx = createContext ?? { isSaasOwner: false };
+        const headBudgets = new Map();
+        const batchKeys = {
+            seenRegistration: new Set(),
+            seenChip: new Set(),
+        };
+        const results = [];
+        for (const item of rows) {
+            const index = Number(item?.index);
+            if (!Number.isInteger(index) || index < 0) {
+                results.push({
+                    index: Number.isFinite(index) ? index : -1,
+                    success: false,
+                    error: 'index must be a non-negative integer',
+                });
+                continue;
+            }
+            const animalBody = item?.animal;
+            if (!animalBody || typeof animalBody !== 'object') {
+                results.push({ index, success: false, error: 'animal payload is required' });
+                continue;
+            }
+            try {
+                const created = await this.persistNewAnimal(animalBody, ctx, headBudgets, batchKeys);
+                results.push({
+                    index,
+                    success: true,
+                    animal_uuid: created.animal_uuid,
+                });
+            }
+            catch (error) {
+                results.push({
+                    index,
+                    success: false,
+                    error: this.errorMessageFromUnknown(error),
+                });
+            }
+        }
+        const created = results.filter((r) => r.success).length;
+        const failed = results.length - created;
+        return {
+            success: true,
+            data: {
+                created,
+                failed,
+                results,
+            },
+        };
+    }
+    registrationKey(ranchUuid, registrationNumber) {
+        return `${ranchUuid}\u0000${registrationNumber.trim().toLowerCase()}`;
+    }
+    chipKey(ranchUuid, chipNumber) {
+        return `${ranchUuid}\u0000${chipNumber.trim().toLowerCase()}`;
+    }
+    assertNoBatchDuplicate(ranchUuid, registration_number, chip_number, batchKeys) {
+        const regKey = this.registrationKey(ranchUuid, registration_number);
+        if (batchKeys.seenRegistration.has(regKey)) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'registration_number is duplicated within this batch for the same ranch',
+            });
+        }
+        if (chip_number) {
+            const cKey = this.chipKey(ranchUuid, chip_number);
+            if (batchKeys.seenChip.has(cKey)) {
+                throw new apiError_1.default({
+                    name: 'ValidationError',
+                    statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                    description: 'chip_number is duplicated within this batch for the same ranch',
+                });
+            }
+        }
+    }
+    rememberBatchKeys(ranchUuid, registration_number, chip_number, batchKeys) {
+        batchKeys.seenRegistration.add(this.registrationKey(ranchUuid, registration_number));
+        if (chip_number) {
+            batchKeys.seenChip.add(this.chipKey(ranchUuid, chip_number));
+        }
+    }
+    async resolveHeadBudget(tenantCompany, headBudgets) {
+        let budget = headBudgets.get(tenantCompany);
+        if (budget) {
+            return budget;
+        }
+        const companyResponse = await this.companyService.getById({ id: tenantCompany, includeInactive: true });
+        if (!companyResponse.success || !companyResponse.data) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'Company not found',
+            });
+        }
+        const plan = (0, subscription_constants_1.normalizeCompanyPlanType)(companyResponse.data.plan_type);
+        const limit = subscription_constants_1.PLAN_HEAD_LIMIT[plan];
+        const baseCount = await this.animalRepository.countActiveByCompany(tenantCompany);
+        budget = { baseCount, createdInBatch: 0, limit, planLabel: plan };
+        headBudgets.set(tenantCompany, budget);
+        return budget;
+    }
+    assertHeadBudgetAvailable(budget) {
+        if (budget.baseCount + budget.createdInBatch >= budget.limit) {
+            throw new apiError_1.default({
+                name: 'PlanAnimalHeadLimitReached',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: `Animal head limit reached for this company (${budget.limit} heads for plan ${budget.planLabel})`,
+            });
+        }
+    }
+    errorMessageFromUnknown(error) {
+        if (error instanceof apiError_1.default) {
+            return error.description || error.message || 'Request failed';
+        }
+        if (error instanceof Error) {
+            return error.message;
+        }
+        return 'Request failed';
+    }
+    async persistNewAnimal(body, ctx, headBudgets, batchKeys) {
         const ranchUuid = body.ranch_uuid?.trim();
         if (!ranchUuid) {
             throw new apiError_1.default({
                 name: 'ValidationError',
                 statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: 'ranch_uuid is required'
+                description: 'ranch_uuid is required',
             });
         }
-        const ctx = createContext ?? { isSaasOwner: false };
         const tenantCompany = await this.resolveTenantCompanyForRanch(ranchUuid, ctx);
         const registration_number = body.registration_number?.trim();
         if (!registration_number) {
             throw new apiError_1.default({
                 name: 'ValidationError',
                 statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: 'registration_number is required'
+                description: 'registration_number is required',
             });
+        }
+        const chip_number = this.normalizeOptionalChip(body.chip_number);
+        if (batchKeys) {
+            this.assertNoBatchDuplicate(ranchUuid, registration_number, chip_number, batchKeys);
         }
         const duplicate = await this.animalRepository.findAnimalUuidByRanchAndRegistration(ranchUuid, registration_number);
         if (duplicate) {
             throw new apiError_1.default({
                 name: 'ValidationError',
                 statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: 'registration_number must be unique within the ranch'
+                description: 'registration_number must be unique within the ranch',
             });
         }
         const breed_code = (body.breed_code ?? '').trim();
@@ -226,7 +387,7 @@ class AnimalService {
             throw new apiError_1.default({
                 name: 'ValidationError',
                 statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: 'Invalid or missing breed_code'
+                description: 'Invalid or missing breed_code',
             });
         }
         let mother_animal_uuid = body.mother_animal_uuid ?? null;
@@ -243,7 +404,7 @@ class AnimalService {
                 throw new apiError_1.default({
                     name: 'ValidationError',
                     statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                    description: 'Owner not found or inactive'
+                    description: 'Owner not found or inactive',
                 });
             }
         }
@@ -253,31 +414,14 @@ class AnimalService {
                 throw new apiError_1.default({
                     name: 'ValidationError',
                     statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                    description: 'Paddock not found or does not belong to this ranch'
+                    description: 'Paddock not found or does not belong to this ranch',
                 });
             }
         }
         await this.validateRanchBelongsToCompany(ranchUuid, { uuid_company: tenantCompany });
-        const companyResponse = await this.companyService.getById({ id: tenantCompany, includeInactive: true });
-        if (!companyResponse.success || !companyResponse.data) {
-            throw new apiError_1.default({
-                name: 'ValidationError',
-                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: 'Company not found'
-            });
-        }
-        const plan = (0, subscription_constants_1.normalizeCompanyPlanType)(companyResponse.data.plan_type);
-        const headLimit = subscription_constants_1.PLAN_HEAD_LIMIT[plan];
-        const currentHeads = await this.animalRepository.countActiveByCompany(tenantCompany);
-        if (currentHeads >= headLimit) {
-            throw new apiError_1.default({
-                name: 'PlanAnimalHeadLimitReached',
-                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
-                description: `Animal head limit reached for this company (${headLimit} heads for plan ${plan})`
-            });
-        }
+        const budget = await this.resolveHeadBudget(tenantCompany, headBudgets);
+        this.assertHeadBudgetAvailable(budget);
         const birth_date = this.assertNormalizedBirthDate(body.birth_date);
-        const chip_number = this.normalizeOptionalChip(body.chip_number);
         if (chip_number) {
             await this.assertChipUniqueInRanch(ranchUuid, chip_number);
         }
@@ -299,7 +443,11 @@ class AnimalService {
             is_active: true,
         };
         const animal = await this.animalRepository.create(payload);
-        return { success: true, data: animal.get({ plain: true }) };
+        budget.createdInBatch += 1;
+        if (batchKeys) {
+            this.rememberBatchKeys(ranchUuid, registration_number, chip_number, batchKeys);
+        }
+        return animal.get({ plain: true });
     }
     async getById(params) {
         const { id, includeInactive, uuid_company, uuid_ranch_in } = params;
@@ -318,7 +466,198 @@ class AnimalService {
                 description: 'Animal not found'
             });
         }
-        return { success: true, data: animal.get({ plain: true }) };
+        const plain = animal.get({ plain: true });
+        if (includeInactive) {
+            const disposalMap = await this.animalDisposalRepository.findLatestByAnimalUuids([plain.animal_uuid]);
+            plain.last_exit = this.mapDisposalToLastExit(disposalMap.get(plain.animal_uuid));
+        }
+        return { success: true, data: plain };
+    }
+    async deactivateWithExit(animalUuid, body, tenantContext) {
+        const validated = this.validateDeactivateBody(body);
+        const current = await this.animalRepository.findById({
+            id: animalUuid,
+            includeInactive: false,
+            uuid_company: tenantContext?.uuid_company,
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        });
+        if (!current) {
+            throw new apiError_1.default({
+                name: 'NotFound',
+                statusCode: httpStatusCodes_1.default.NOT_FOUND,
+                description: 'Animal not found or already inactive',
+            });
+        }
+        const plain = current.get({ plain: true });
+        const currentStatus = (0, animal_exit_constants_1.exitTypeToCurrentStatus)(validated.exit_type);
+        const disposalRow = await this.animalDisposalRepository.create({
+            animal_uuid: animalUuid,
+            disposal_date: validated.exit_date,
+            disposal_type: validated.exit_type,
+            reason: validated.reason,
+            description: validated.description,
+            is_active: true,
+        });
+        const marked = await this.animalRepository.markInactiveWithStatus(animalUuid, currentStatus, tenantContext);
+        if (!marked) {
+            throw new apiError_1.default({
+                name: 'NotFound',
+                statusCode: httpStatusCodes_1.default.NOT_FOUND,
+                description: 'Animal not found or already inactive',
+            });
+        }
+        const updated = await this.animalRepository.findById({
+            id: animalUuid,
+            includeInactive: true,
+            uuid_company: tenantContext?.uuid_company,
+            uuid_ranch_in: tenantContext?.uuid_ranch_in,
+        });
+        return {
+            success: true,
+            data: {
+                animal: (updated?.get({ plain: true }) ?? {
+                    ...plain,
+                    is_active: false,
+                    current_status: currentStatus,
+                }),
+                disposal: disposalRow.get({ plain: true }),
+            },
+        };
+    }
+    async deactivateBatchWithExit(body, tenantContext) {
+        const inputRows = Array.isArray(body?.rows) ? body.rows : [];
+        if (inputRows.length === 0) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'rows array is required and must not be empty',
+            });
+        }
+        if (inputRows.length > ANIMAL_DEACTIVATE_BATCH_MAX) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: `Batch cannot exceed ${ANIMAL_DEACTIVATE_BATCH_MAX} animals`,
+            });
+        }
+        const seenUuids = new Set();
+        const rows = [];
+        let success = 0;
+        let failed = 0;
+        for (const row of inputRows) {
+            const animalUuid = String(row?.animal_uuid ?? '').trim();
+            if (!animalUuid) {
+                failed += 1;
+                rows.push({ animal_uuid: '', success: false, error: 'animal_uuid is required' });
+                continue;
+            }
+            if (seenUuids.has(animalUuid)) {
+                failed += 1;
+                rows.push({ animal_uuid: animalUuid, success: false, error: 'Duplicate animal_uuid in batch' });
+                continue;
+            }
+            seenUuids.add(animalUuid);
+            try {
+                const validated = this.validateDeactivateBody(row);
+                await this.deactivateWithExit(animalUuid, {
+                    exit_type: validated.exit_type,
+                    exit_date: validated.exit_date.toISOString().slice(0, 10),
+                    reason: validated.reason,
+                    description: validated.description,
+                }, tenantContext);
+                rows.push({ animal_uuid: animalUuid, success: true });
+                success += 1;
+            }
+            catch (err) {
+                failed += 1;
+                const message = err instanceof apiError_1.default ? err.description : 'Deactivate failed';
+                rows.push({ animal_uuid: animalUuid, success: false, error: message });
+            }
+        }
+        return {
+            success: true,
+            data: {
+                requested: inputRows.length,
+                success,
+                failed,
+                rows,
+            },
+        };
+    }
+    validateDeactivateBody(body) {
+        const exitRaw = typeof body?.exit_type === 'string' ? body.exit_type.trim().toUpperCase() : '';
+        if (!(0, animal_exit_constants_1.isAnimalExitType)(exitRaw)) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: `exit_type must be one of: ${animal_exit_constants_1.ANIMAL_EXIT_TYPES.join(', ')}`,
+            });
+        }
+        const exit_date = this.parseExitDate(body?.exit_date);
+        const reason = typeof body?.reason === 'string' && body.reason.trim() ? body.reason.trim() : null;
+        const description = typeof body?.description === 'string' && body.description.trim() ? body.description.trim() : null;
+        return { exit_type: exitRaw, exit_date, reason, description };
+    }
+    parseExitDate(raw) {
+        if (raw === null || raw === undefined) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'exit_date is required',
+            });
+        }
+        if (raw instanceof Date) {
+            if (Number.isNaN(raw.getTime())) {
+                throw new apiError_1.default({
+                    name: 'ValidationError',
+                    statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                    description: 'Invalid exit_date',
+                });
+            }
+            return raw;
+        }
+        const s0 = String(raw).trim();
+        if (!s0) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'exit_date is required',
+            });
+        }
+        const s = /^\d{4}-\d{2}-\d{2}T/.test(s0) ? s0.slice(0, 10) : s0;
+        const isoDate = /^(\d{4})-(\d{2})-(\d{2})$/;
+        const m = isoDate.exec(s);
+        if (!m) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'exit_date must be YYYY-MM-DD',
+            });
+        }
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const da = Number(m[3]);
+        const utc = new Date(Date.UTC(y, mo - 1, da));
+        if (utc.getUTCFullYear() !== y || utc.getUTCMonth() !== mo - 1 || utc.getUTCDate() !== da) {
+            throw new apiError_1.default({
+                name: 'ValidationError',
+                statusCode: httpStatusCodes_1.default.BAD_REQUEST,
+                description: 'Invalid exit_date',
+            });
+        }
+        return utc;
+    }
+    mapDisposalToLastExit(disposal) {
+        if (!disposal) {
+            return null;
+        }
+        return {
+            disposal_uuid: disposal.animal_disposal_uuid,
+            exit_type: disposal.disposal_type,
+            exit_date: disposal.disposal_date,
+            reason: disposal.reason ?? null,
+            description: disposal.description ?? null,
+        };
     }
     async update(id, animalBody, tenantContext) {
         if (!id || id.trim() === '') {

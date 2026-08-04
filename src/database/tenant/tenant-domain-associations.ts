@@ -6,6 +6,18 @@ export type TenantDomainModels = OperationalModelsBundle & {
     AnimalModel: ModelStatic<Model>;
     AnimalLegacyModel: ModelStatic<Model>;
     AnimalWorkSessionModel: ModelStatic<Model>;
+    CorralWorkSessionModel: ModelStatic<Model>;
+    WorkSessionPlannedActivityModel: ModelStatic<Model>;
+    CorralSessionStepModel: ModelStatic<Model>;
+    CorralStepActivityModel: ModelStatic<Model>;
+    CorralSessionSourceModel: ModelStatic<Model>;
+    CorralSessionAnimalModel: ModelStatic<Model>;
+    CorralStepAnimalModel: ModelStatic<Model>;
+    CorralActivityRecordModel: ModelStatic<Model>;
+    CorralAnimalObservationModel: ModelStatic<Model>;
+    CorralAnimalVisualConditionModel: ModelStatic<Model>;
+    CorralAnimalAdditionalMedicationModel: ModelStatic<Model>;
+    CorralAnimalAdditionalTreatmentModel: ModelStatic<Model>;
 };
 
 export function associateTenantDomainModels(m: TenantDomainModels): void {
@@ -13,6 +25,19 @@ export function associateTenantDomainModels(m: TenantDomainModels): void {
         RanchModel,
         AnimalModel,
         AnimalLegacyModel,
+        CorralWorkSessionModel,
+        WorkSessionPlannedActivityModel,
+        CorralSessionStepModel,
+        CorralStepActivityModel,
+        CorralSessionSourceModel,
+        CorralSessionAnimalModel,
+        CorralStepAnimalModel,
+        CorralActivityRecordModel,
+        CorralAnimalObservationModel,
+        CorralAnimalVisualConditionModel,
+        CorralAnimalAdditionalMedicationModel,
+        CorralAnimalAdditionalTreatmentModel,
+        AnimalWorkSessionModel,
         WorkOrderModel,
         WorkOrderAnimalModel,
         MilkingSessionModel,
@@ -469,5 +494,112 @@ export function associateTenantDomainModels(m: TenantDomainModels): void {
     BirthModel.belongsTo(AnimalModel, {
         foreignKey: 'newborn_animal_uuid',
         as: 'newborn_animal',
+    });
+
+    RanchModel.hasMany(CorralWorkSessionModel, {
+        foreignKey: 'ranch_uuid',
+        as: 'corral_work_sessions',
+    });
+
+    CorralWorkSessionModel.belongsTo(RanchModel, {
+        foreignKey: 'ranch_uuid',
+        as: 'ranch',
+    });
+
+    PaddockModel.hasMany(CorralWorkSessionModel, {
+        foreignKey: 'paddock_uuid',
+        as: 'corral_work_sessions',
+    });
+
+    CorralWorkSessionModel.belongsTo(PaddockModel, {
+        foreignKey: 'paddock_uuid',
+        as: 'paddock',
+    });
+
+    CorralWorkSessionModel.hasMany(WorkSessionPlannedActivityModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'planned_activities',
+    });
+
+    WorkSessionPlannedActivityModel.belongsTo(CorralWorkSessionModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'corral_work_session',
+    });
+
+    CorralWorkSessionModel.hasMany(AnimalWorkSessionModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'animal_records',
+    });
+
+    AnimalWorkSessionModel.belongsTo(CorralWorkSessionModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'corral_work_session',
+    });
+
+    AnimalModel.hasMany(AnimalWorkSessionModel, {
+        foreignKey: 'uuid_animal',
+        as: 'corral_work_records',
+    });
+
+    AnimalWorkSessionModel.belongsTo(AnimalModel, {
+        foreignKey: 'uuid_animal',
+        as: 'animal',
+    });
+
+    CorralWorkSessionModel.hasMany(CorralSessionStepModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'steps',
+    });
+    CorralSessionStepModel.belongsTo(CorralWorkSessionModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'corral_work_session',
+    });
+
+    CorralSessionStepModel.hasMany(CorralStepActivityModel, {
+        foreignKey: 'uuid_corral_session_step',
+        as: 'activities',
+    });
+    CorralStepActivityModel.belongsTo(CorralSessionStepModel, {
+        foreignKey: 'uuid_corral_session_step',
+        as: 'step',
+    });
+
+    CorralWorkSessionModel.hasMany(CorralSessionSourceModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'sources',
+    });
+    CorralWorkSessionModel.hasMany(CorralSessionAnimalModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'session_animals',
+    });
+    CorralSessionAnimalModel.belongsTo(AnimalModel, {
+        foreignKey: 'animal_uuid',
+        as: 'animal',
+    });
+
+    CorralSessionStepModel.hasMany(CorralStepAnimalModel, {
+        foreignKey: 'uuid_corral_session_step',
+        as: 'step_animals',
+    });
+    CorralStepAnimalModel.belongsTo(CorralSessionStepModel, {
+        foreignKey: 'uuid_corral_session_step',
+        as: 'step',
+    });
+    CorralStepAnimalModel.belongsTo(AnimalModel, {
+        foreignKey: 'animal_uuid',
+        as: 'animal',
+    });
+
+    CorralWorkSessionModel.hasMany(CorralActivityRecordModel, {
+        foreignKey: 'uuid_corral_work_session',
+        as: 'activity_records',
+    });
+    CorralActivityRecordModel.belongsTo(CorralSessionStepModel, {
+        foreignKey: 'uuid_corral_session_step',
+        as: 'step',
+    });
+    CorralActivityRecordModel.belongsTo(AnimalModel, {
+        foreignKey: 'animal_uuid',
+        as: 'animal',
     });
 }

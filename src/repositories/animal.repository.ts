@@ -1,4 +1,9 @@
-import { AnimalCreationAttributes, AnimalAttributes, AnimalSex } from "../interfaces/animal/animal.interface";
+import {
+    AnimalCreationAttributes,
+    AnimalAttributes,
+    AnimalCurrentStatus,
+    AnimalSex,
+} from "../interfaces/animal/animal.interface";
 import { IBaseRepository } from "../interfaces/repositories/base-repository.interface";
 import { Status } from "../interfaces/params/query.interface";
 import { Op } from "sequelize";
@@ -173,6 +178,45 @@ class AnimalRepository implements
         }
 
         const [count] = await AnimalModel.update({ is_active: false }, { where: { animal_uuid, is_active: true } });
+        return count > 0;
+    }
+
+    async markInactiveWithStatus(
+        animal_uuid: string,
+        current_status: AnimalCurrentStatus,
+        options?: { uuid_company?: string; uuid_ranch_in?: string[] }
+    ): Promise<boolean> {
+        const { AnimalModel, RanchModel } = requireTenantModels();
+        let canUpdate = true;
+        if (options?.uuid_company || options?.uuid_ranch_in?.length) {
+            const current = await AnimalModel.findOne({ where: { animal_uuid, is_active: true } });
+            if (current) {
+                const plain = current.get({ plain: true }) as AnimalAttributes;
+                if (options.uuid_ranch_in?.length && !options.uuid_ranch_in.includes(plain.ranch_uuid)) {
+                    canUpdate = false;
+                } else {
+                    const ranchWhere: Record<string, unknown> = {
+                        uuid_ranch: plain.ranch_uuid,
+                        is_active: true,
+                    };
+                    if (options.uuid_company) {
+                        ranchWhere.uuid_company = options.uuid_company;
+                    }
+                    const ranch = await RanchModel.findOne({ where: ranchWhere });
+                    canUpdate = Boolean(ranch);
+                }
+            } else {
+                canUpdate = false;
+            }
+        }
+        if (!canUpdate) {
+            return false;
+        }
+
+        const [count] = await AnimalModel.update(
+            { is_active: false, current_status },
+            { where: { animal_uuid, is_active: true } }
+        );
         return count > 0;
     }
 

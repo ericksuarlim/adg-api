@@ -7,8 +7,8 @@ export type AnimalCurrentStatus = 'ACTIVE' | 'SOLD' | 'DISPOSED' | 'DEAD' | 'MIS
 export interface AnimalAttributes {
     animal_uuid: string;
     ranch_uuid: string;
-    /** Controlled vocabulary; see `cattle-breed.constants`. */
-    breed_code: string;
+    /** Controlled vocabulary; see `cattle-breed.constants`. Optional. */
+    breed_code?: string | null;
     registration_number: string;
     /** Ear tag / RFID; optional and unique per ranch when set. */
     chip_number?: string | null;
@@ -30,6 +30,7 @@ export interface AnimalAttributes {
 export type AnimalCreationAttributes = Optional<
     AnimalAttributes,
     | 'animal_uuid'
+    | 'breed_code'
     | 'mother_animal_uuid'
     | 'father_animal_uuid'
     | 'current_owner_uuid'
