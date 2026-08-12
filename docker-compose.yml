@@ -56,7 +56,6 @@ services:
     command: npm run dev:debug
     volumes:
       - .:/app
-      - ../shared:/app/shared:ro
       - adg_api_node_modules:/app/node_modules
     depends_on:
       postgres:

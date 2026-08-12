@@ -31,5 +31,5 @@ export interface IBaseServiceInterface<T, C> {
     getAll(params: IBaseParams): Promise<ServiceResponse<T[]>>;
     create(data: C, options?: unknown): Promise<ServiceResponse<T>>;
     update(id: string | number, data: C, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<T | null>>;
-    delete(id: string | number, tenantContext?: { uuid_company?: string }): Promise<ServiceResponse<null>>;
+    delete(id: string | number, tenantContext?: { uuid_company?: string; requestingUuidUser?: string }): Promise<ServiceResponse<null>>;
 }
