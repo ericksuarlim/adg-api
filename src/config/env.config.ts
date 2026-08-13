@@ -11,6 +11,7 @@ export const envConfig = {
     DB_NAME: process.env.DB_NAME || '',
     DB_HOST: process.env.DB_HOST || 'localhost',
     DB_PORT: Number(process.env.DB_PORT) || 5432,
+    DB_SSL: process.env.DB_SSL === 'true',
     /** Max cached tenant Sequelize connections per API process (LRU eviction). */
     TENANT_POOL_MAX: process.env.TENANT_POOL_MAX ? Number(process.env.TENANT_POOL_MAX) : undefined,
     PORT: process.env.PORT || '3010',

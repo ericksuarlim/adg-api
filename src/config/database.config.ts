@@ -8,7 +8,14 @@ const databaseConfig = {
     port: envConfig.DB_PORT,
     dialect: 'postgres',
     logging: false,
-    dialectOptions: {
+    dialectOptions: envConfig.DB_SSL
+    ? {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
+      }
+    : {
         ssl: false,
     },
 };
