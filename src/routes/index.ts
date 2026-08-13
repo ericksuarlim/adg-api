@@ -12,9 +12,11 @@ import { resolveTenantOperationalContext } from "../middlewares/tenant-context.m
 import ownerRoutes from "./owner.routes";
 import paddockRoutes from "./paddock.routes";
 import referenceSampleRoutes from "./reference-sample.routes";
+import healthRoutes from "./health.routes";
 
 const router = Router();
 
+router.use('/health', healthRoutes);
 router.use('/session', authenticationRoutes);
 router.use(authenticate);
 

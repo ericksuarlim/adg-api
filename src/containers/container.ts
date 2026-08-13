@@ -39,6 +39,8 @@ import OwnerController from "../controllers/owner.controller";
 import PaddockRepository from "../repositories/paddock.repository";
 import PaddockService from "../services/paddock.service";
 import PaddockController from "../controllers/paddock.controller";
+import HealthService from "../services/health.service";
+import HealthController from "../controllers/health.controller";
 
 //Repositories
 const companyRepository = new CompanyRepository();
@@ -80,6 +82,7 @@ const membershipService = new MembershipService(userService, ranchService);
 const referenceSampleService = new ReferenceSampleService(referenceSampleRepository);
 const companyPaymentService = new CompanyPaymentService(companyPaymentRepository, companyService);
 const ownerService = new OwnerService(ownerRepository);
+const healthService = new HealthService();
 
 //Controllers
 const userController = new UserController(userService, userService);
@@ -94,6 +97,7 @@ const referenceSampleController = new ReferenceSampleController(referenceSampleS
 const companyPaymentController = new CompanyPaymentController(companyPaymentService);
 const ownerController = new OwnerController(ownerService);
 const paddockController = new PaddockController(paddockService);
+const healthController = new HealthController(healthService);
 
 export { membershipRepository };
 
@@ -109,5 +113,6 @@ export const container = {
     referenceSampleController,
     companyPaymentController,
     ownerController,
-    paddockController
+    paddockController,
+    healthController
 }
